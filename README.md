@@ -11,7 +11,6 @@ By monitoring the spectrum of the band where the RF12B operates you get the abil
 - Select a vacant frequency for the network instead of using the factory set one that everybody else is using
 - Adjust power level of each node so that they won't interfere with adjacent networks
 
-
 The spectrum analyzer consists of two parts:
 
 1. A sketch that needs to be uploaded to an Arduino board equipped with an RFM12B module. 
