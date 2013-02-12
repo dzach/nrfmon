@@ -22,6 +22,8 @@ Automatic comms port enumeration has been set for devices in the form of:
 
 /dev/ttyUSB* and /dev/ttyACM*
 
+Ready to use binaries (no need to install TCL):
+*   Linux x86 : https://raw.github.com/dzach/rfmon/master/binaries/rfmon
 
 CREDITS:
 
