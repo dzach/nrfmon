@@ -1,7 +1,7 @@
 RfMon
 =======
 
-RfMon: a software spectrum analyzer for the RFM12B tranceiver module running in an Arduino.
+A software spectrum analyzer for the RFM12B tranceiver module running in an Arduino.
 
 Use this program to visualize what the RFM12B tranceiver module hears on the 433, 868 or 915 MHz band.
 It implements some basic tools to help annotate and compare link conditions for communication between Arduinos.
