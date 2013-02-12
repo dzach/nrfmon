@@ -9,7 +9,6 @@ typedef struct {
     byte group;
     word FSC;
     word TXC;
-    word crc;
 } RF12Config;
 
 static RF12Config config;
