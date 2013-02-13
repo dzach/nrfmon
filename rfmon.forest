@@ -1,0 +1,18 @@
+usernodes {:U2 {-class user -path proj -children {:U2,1 :U2,2 :U2,3 :U2,4 :U2,5} -text rf12mon -value {#!/usr/bin/tclsh8.6
+
+## ------------------------------------------------------
+## A software spectrum analyzer for the RF12B radio module
+## (C) 2013, D.Zachariadis
+## Licensed under the GPLv3
+## ------------------------------------------------------
+
+} -image ::deep::proj_img -x -101.0 -y 478.0} :U2,1 {-path ::init -class proc -text init -children {} -image ::deep::tcl::proc_img -grow -1 -stem 0 -side -1 -prune 0} :U2,2 {-path text -class user -text Script -image ::deep::tcl::text_img -children {} -value {#
+init
+} -grow 1 -stem 0 -side -1 -prune 0} :U2,3 {-path ::mon -class namespace -text ::mon -children yes -image ::deep::tcl::namespace_img -grow -1 -stem 0 -side -1 -prune 0} :U2,4 {-path ::main -class proc -text main -children {} -image ::deep::tcl::proc_img -grow -1 -stem 0 -side -1 -prune 0} :U2,5 {-path text -class user -text Script -image ::deep::tcl::text_img -children {} -value {##
+main
+
+} -grow 1 -stem 0 -side -1 -prune 0}}
+changed {:: {-side -1 -grow -1 -autoprune 1 -prune 30} tcl {-side -1} ::mon {-side 1 -grow 1} .spec {-side 1} .spec.c {-autoprune 1 -prune 30} ::mon::procs {-autoprune 1 -prune 30} .mon {-side -1} ::mon::var,array {-autoprune 1 -prune 30} ::rf {-side 1} ::mon::rf {-grow -1} ::procs {-autoprune 1 -prune 30}}
+nodes {:tcl {-idxs :tcl -class tcl -path tcl -children yes -text Tcl -image ::deep::tcl::tcl_img -idx :tcl -x -176.0 -y 481.0 -grow 1 -stem 0 -side -1} :U2 {-idxs :U2,3,3 -class user -path proj -children {:U2,1 :U2,2 :U2,3 :U2,4 :U2,5} -text rf12mon -image ::deep::proj_img -x -101.0 -y 478.0 -idx :U2 -grow 1 -stem 0 -side 1}}
+
+prefs {::deep::tcl::var(separateNs) {} ::deep::tcl::var(separateNsDir) {}}
