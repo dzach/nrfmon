@@ -236,10 +236,10 @@ proc buildControls W {
 		$W.portcb config -values \[[namespace current]::enumerate ports]
 	"]] -anchor nw -fill x
 	
-	bind $W.portcb <<ComboboxSelected>> "
-		[namespace current]::portSetup
-		set [namespace current]::var(scanbtn) Stop
-	"
+	bind $W.portcb <<ComboboxSelected>> [namespace current]::portSetup
+	bind $W.portcb <Return> [namespace current]::portSetup
+	bind $W.portcb <KP_Enter> [namespace current]::portSetup
+	
 	pack [set w [::ttk::frame $W.scf -padding {2 5}]] -anchor nw
 	pack [set var(scanb) [::ttk::checkbutton $w.scanb -style bold.TButton -text "Scan" -variable [namespace current]::var(scanning) -command [namespace current]::toggleScan -width 8 -padding {0 3}]] -anchor w -fill x -side left -padx 2
 	pack [::ttk::button $w.clrb -text "Clear" -command [list [namespace current]::clear screen] -width 12 -padding {0 4}] -anchor w -fill x -side left -padx 1
