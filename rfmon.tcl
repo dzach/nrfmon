@@ -66,6 +66,7 @@ proc bildBinds {} {
 	"
 	bind $var(top) <<PortChanged>> [list [namespace current]::onChange port %d]
 	bind $var(top) <<SettingsChanged>> [list [namespace current]::onChange %d]
+	bind $var(top) <Control-1> [list [namespace current]::zoneSelect reset]
 }
 
 # namespace ::mon
