@@ -1,9 +1,11 @@
 RfMon
 =======
 
-A software spectrum analyzer for the RFM12B tranceiver module running in an Arduino.
+A software spectrum analyzer for the RFM12B transceiver module running in an Arduino.
 
-Use this program to visualize what the RFM12B tranceiver module hears on the 433, 868 or 915 MHz band.
+![Screenshot](https://raw.github.com/dzach/rfmon/master/images/rf12forensics.png)
+
+Use this program to visualize what the RFM12B transceiver module hears on the 433, 868 or 915 MHz band.
 It implements some basic tools to help annotate and compare link conditions for communication between Arduinos.
 
 By monitoring the spectrum of the band where the RF12B operates you get the ability to:
@@ -14,15 +16,14 @@ By monitoring the spectrum of the band where the RF12B operates you get the abil
 The spectrum analyzer consists of two parts:
 
 1. A sketch that needs to be uploaded to an Arduino board equipped with an RFM12B module. 
-2. A TCL script that runs on a PC and connects the Arduino + RFM12B with the PC, presenting the user with a waterfall and spectrum plot of the 868MHz frequency band.
+2. A TCL script that runs on a PC and connects the Arduino + RFM12B with the PC, presenting the user with a waterfall and spectrum plot of the frequency band in use.
 
-To use it you need to have a copy of tcl8.6 installed as well as the Arduino IDE with the JeeLibs library. The program has been tested with Linux, but should work on any platform where tcl8.6 exists.
-
-Automatic comms port enumeration has been set for devices in the form of:
+To use it you need to have a copy of tcl8.6 installed as well as the Arduino IDE with the JeeLibs library. The program has been tested with Linux, but should work on any platform where tcl8.6 exists. If you do not have tcl8.6 installed you can use one of the executable binaries provided below.
+Select the port where the RFM12B carrying node is commected. Automatic comms port enumeration has been set for devices in the form of:
 
 /dev/ttyUSB* and /dev/ttyACM*
 
-Ready to use binaries (no need to install TCL):
+Ready to use binaries (no need to install tcl8.6):
 *   Linux x86 : https://raw.github.com/dzach/rfmon/master/binaries/rfmon
 
 CREDITS:
