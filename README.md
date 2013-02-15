@@ -26,6 +26,10 @@ Select the port where the RFM12B carrying node is commected. Automatic comms por
 Ready to use binaries (no need to install tcl8.6):
 *   Linux x86 : https://raw.github.com/dzach/rfmon/master/binaries/rfmon
 
+NOTE:
+
+The output of the RFM12B module is 5dBm on a matched 50 Ohm termination, i.e. it is a low power transmitter. While use of the RFM12B is allowed in specific bands around the world, one should always read and abide by the rules and laws of each country, when conducting low power tests on radio frequencies, even with such low power levels.
+
 CREDITS:
 
 The sketch is based on the JeeLib library, https://github.com/jcw/jeelib, created by J.C.Wippler, http://jeelabs.org/2010/06/27/rfm12b-as-spectrum-analyzer/, which was itself based on an idea of loomi, back in 2010,http://talk.jeelabs.net/topic/385
