@@ -8,7 +8,7 @@
   Change the last part in the next line to reflect the hardware signature that'll be shown on the RfMon screen.
   The signature is a dictionary, i.e. should be pairs of key/value, where the last pair is the hardware type
 */
-#define RFMON_SIGNATURE F("xcvr rf12b ver 0.5 hw JeeNode.v6")
+#define RFMON_SIGNATURE F("xcvr rf12b ver 0.5.1 hw JeeNode.v6")
 
 //#define LED_PIN     9   // activity LED, comment out to disable
 
