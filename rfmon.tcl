@@ -2052,6 +2052,7 @@ proc tuneHere f {
 	## tune on this point on screen
 	variable var
 	
+	if {$f < 0 || $var(wf,W) < $f} return
 	# use current bandwidth value
 	set var(xcvr,FSC,F) [scr2chan $f]
 	set var(xcvr,FSC,Freq) [scr2freq $f]

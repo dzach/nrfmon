@@ -14,13 +14,17 @@
 
 #define RFMON_RX 0
 #define RFMON_SCAN 1
-#define RFMON_XMIT 2
+#define RFMON_XCW 2
+#define RFMON_XFSK 3
 
 #define RFMON_MINBW 1
 #define RFMON_PRGID 1
 #define RFMON_PRXMIT 2
 #define RFMON_PRSCAN 4
 #define RFMON_PRCMDS 8
+
+// initial auto transmit delay
+#define RFMON_XDELAY 10
 
 typedef struct {
     byte nodeId;
@@ -37,11 +41,12 @@ static boolean num = false;
 static word value, stack[RF12_MAXDATA];
 static char asc[] = " .;~+=#@";
 static byte ascart = 0;
+static byte fsk = 0xA;
 
 // all times are in seconds
-static long ontime = 10;
-static long offtime = 5;
-static long xtime;
+static long ondur = 10;
+static long offdur = 5;
+static unsigned long xontime,xofftime;
 
 // channel limits
 static word lower = 96, upper = 3903, scale = 26;
@@ -95,18 +100,29 @@ static void setPower (byte patt) {
 }
 
 // turn carrier on for a number of seconds
-static void xmitOn(unsigned long on) {
+static void xmitOn(long on) {
   rf12_initialize(0, config.nodeId >> 6);
   rf12_control(config.FSC);
   rf12_control(config.TXC);
-  on *= 1000;
   rf12_onOff(1);
-  while(on--)
-    if (!Serial.available())
-      delay(1);
+  while (on-- && !Serial.available())
+    delay(1);
   rf12_onOff(0);
   rf12_config(0); // restore normal packet listening mode
   rf12_control(config.RCC);
+}
+
+static void xmitFSK(byte c) {
+  byte payload[62];
+  for (byte i=0; i<62; i++)
+    payload[i]=c;
+  // transmit untill target 'on' time is reached
+  while (millis() < xofftime && ! Serial.available()) {
+    while (!rf12_canSend())
+      rf12_recvDone();
+    rf12_sendStart(0, &payload, sizeof payload);
+  }
+  delay(1);
 }
 
 static void setCmdWord(word cmd) {
@@ -158,15 +174,15 @@ static void handleInput (char c) {
       // enter rx mode mode
       mode = rx_mode;
       // stop auto transmit
-      ontime = -1;
+      ondur = -1;
       // signal command output
       Serial.print("<");
-      Serial.print((int) value);
+      Serial.print(value,DEC);
       Serial.print(c);
       Serial.print(" ");
       switch (c) { 
-          // a,b,c,d,e,f,g, ,i, ,k,l, , , , ,q,r,s,t, , ,w, , ,  are used in RF12demo
-          //  , , , , , , ,h, ,j, , ,m,n,o,p, , , , ,u,v, ,x,y,z   are free to use here
+          // a,*b,*c,d,e,f,*g, ,*i, ,k,*l, , , ,  ,q,r,s,t, ,   ,w, , ,  are used in RF12demo
+          //  , , , , , ,    ,h, ,j, ,   ,m,n,o,*p, , , , ,*u,*v, ,*x,y,*z   are free to use here
           case 'r': // a series of registers to set
             if (!num) {
               printSettings(RFMON_PRCMDS);Serial.println();
@@ -230,23 +246,32 @@ static void handleInput (char c) {
               printSettings(RFMON_PRXMIT); Serial.println();
               break;
           case 'x': // turn on transmitter for value seconds
-              activityLed(1);
-              // if there is a second parameter to the x command, then turn on auto transmit mode
-              if (top) {
-                mode = RFMON_XMIT;
-                ontime = value;
-                offtime = stack[0];
-                Serial.print("x {");Serial.print(value); Serial.print(" "); Serial.print(stack[0]); Serial.println("}");
-                break;
-              }
-              // turn on transmitter, 5s default
               if (!value)
                 value = 5;
-              // TODO: FSK transmission
-              xmitOn(value);
-              Serial.print("x ");Serial.print(value); printSettings(RFMON_PRXMIT); Serial.println();
-              break;
-          case 's': // turn on scan mode
+              // if there are more parameters to the x command, then turn on auto transmit mode
+              switch (top) {
+                case 0: // transmit continuous carrier for a time period and stop
+                  mode = RFMON_XCW;
+                  offdur = 0;
+                  break;
+                case 1: // transmit CW for a time period
+                  offdur = stack[0];
+                  mode = RFMON_XCW;
+                  break;
+                default:  // transmit fsk packets for a time period
+                  fsk = stack[top-2];
+                  offdur = stack[top-1];
+                  mode = RFMON_XFSK;
+                  break;
+             }
+             ondur = value;
+             Serial.print("x {");Serial.print(ondur); Serial.print(" "); Serial.print(offdur); Serial.print("}");
+             if (mode == RFMON_XFSK) {
+               Serial.print(" fsk 0x");Serial.print(fsk,HEX);
+             }
+             Serial.println();
+             break;
+           case 's': // turn on scan mode
               ascart = value;
               mode = rx_mode = RFMON_SCAN;
               printSettings(RFMON_PRSCAN);Serial.println();
@@ -275,7 +300,8 @@ void setup () {
   config.TXC = 0x9807;  // FSK = 15kHz, Pwr = -17.5dB, FSK shift = positive
   // set defaults
   rf12_config(0);
-  xtime = millis() + 10 * 1000;
+  xontime = millis() + RFMON_XDELAY * 1000;
+  mode = RFMON_XCW;
 }
 
 void loop () {
@@ -285,10 +311,21 @@ void loop () {
     handleInput(Serial.read());
   }
   // check if its time to turn on auto transmit
-  if (ontime >= 0 && millis() > xtime) {
-    mode = RFMON_XMIT;
-    xmitOn(ontime);
-    xtime = millis() + offtime * 1000;
+  if (ondur >= 0) {
+    // start transmitting if time has come
+    if (millis() > xontime) {
+      // calculate when to stop transmitting
+      xofftime = millis() + ondur * 1000;
+      if (mode == RFMON_XCW)
+        xmitOn(ondur * 1000);
+      else
+        xmitFSK(fsk);
+      if (!offdur) // just one shot, then we are done with this transmission
+        ondur = -1;
+      else 
+        // repeat on/off sequence
+        xontime = millis() + offdur * 1000;
+    }
   }
   else if (mode == RFMON_SCAN) {
     scanRSSI(lower, upper, scale);
