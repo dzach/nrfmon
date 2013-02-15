@@ -394,7 +394,7 @@ proc buildQuickSettings W {
 		Receiver {FSC,Freq FSC,F CSC,FB RCC,BW RCC,LNA RCC,RSSI}
 		Transmitter {TXC,Pwr TXC,M DRC,R DRC,BR DRC,DBR PLL,Bw0 }
 		{Data filter & AFC} {DFC,Al DFC,Ml DFC,DQD AFC,A AFC,Rl AFC,Fi}
-		RfMon {rfMon,Id SP,B rfMon,Ack rfMon,Zw}
+		nRfMon {rfMon,Id SP,B rfMon,Ack rfMon,Zw}
 	} {
 		## create a container for the fields
 		place [set lf [::ttk::frame $w.f$i-$x -borderwidth 1 -relief ridge -padding 5]] -x $x -y 0 -width 210 -height 132
@@ -507,7 +507,7 @@ proc buildSettings W {
 	buildQuickSettings $W
 
 	::ttk::frame $W.monsetf -padding 0
-	$var(setnb) add $W.monsetf -text "RfMon settings"
+	$var(setnb) add $W.monsetf -text "nRfMon settings"
 	# select the 'quick settings' panel
 	$W select 1
 }
@@ -950,7 +950,7 @@ proc drawScreen W {
 	$W create line -500 0 $var(c,W) 0 -tags [list st sth fx] -fill #444
 	$W create line $var(wf,W) -$var(top,margin) $var(wf,W) $var(c,H) -tags [list st stv fx] -fill #444
 	$W create line -500 $var(wf,H) $var(c,W) $var(wf,H) -tags [list st sth fx] -fill #444
-	$W create line [expr {$var(sl,start) + $var(sa,H)}] -$var(top,margin) [expr {$var(sl,start) + $var(sa,H)}] $var(wf,H) -tags [list st stv fx] -fill #444
+	$W create line [expr {$var(sl,start) + $var(sa,H)}] -$var(top,margin) [expr {$var(sl,start) + $var(sa,H)}] $var(c,H) -tags [list st stv fx] -fill #444
 
 	$W create text -50 -10 -text "Time" -anchor sw -font {TkDefaultFont -10 bold} -fill $ttcolor -tags {tmt fx tt}
 	$W create text -58 -5 -text "" -anchor w -font {TkDefaultFont -9} -fill #666 -tags {clock fx}
@@ -959,9 +959,9 @@ proc drawScreen W {
 	$W create text -50 [expr {$var(wf,H) + 0 + 5}] -text "dBm" -anchor nw -font {TkDefaultFont -10 bold} -fill $ttcolor -tags {gat fx tt}
 	$W create text 5 -10 -text "MHz" -anchor sw -fill #444 -tags {hzt fx} -font {TkDefaultFont -12 bold}
 	$W create text [expr {$var(c,W) - $var(left,margin) - 10}] 5 -text "Events" -anchor ne -fill $ttcolor -tags {evt fx tt} -font {TkDefaultFont -11 bold}
-	$W create text [expr {$var(c,W) - $var(left,margin) - 76}] -3 -anchor se -text "Rf" -fill #88f -tags {RFmon Rf fx NO} -font {TkDefaultFont -14 bold}
-	$W create text [expr {$var(c,W) - $var(left,margin) - 40}] -3 -anchor se -text "mon" -fill #f80 -tags {RFmon mon fx NO} -font {TkDefaultFont -14 bold}
-	$W create text [expr {$var(c,W) - $var(left,margin) - 5}] -3 -anchor se -text $var(version) -fill #444 -tags {RFmon mon fx NO} -font {TkDefaultFont -12 bold}
+	$W create text [expr {$var(c,W) - $var(left,margin) - 81}] -3 -anchor se -text "nRf" -fill #88f -tags {RFmon Rf fx NO} -font {TkDefaultFont -14 bold}
+	$W create text [expr {$var(c,W) - $var(left,margin) - 45}] -3 -anchor se -text "mon" -fill #f80 -tags {RFmon mon fx NO} -font {TkDefaultFont -14 bold}
+	$W create text [expr {$var(c,W) - $var(left,margin) - 5}] -3 -anchor se -text $var(version) -fill #666 -tags {RFmon ver fx NO} -font {TkDefaultFont -10 bold}
 	$W create text [expr {$var(c,W) - $var(left,margin) - 10}] [expr {$var(wf,H) + 0 + 5}] -text "Spectrum" -anchor ne -fill $ttcolor -tags {sat fx tt} -font {TkDefaultFont -11 bold}
 	drawGrid $W
 	# vertical x cursor
@@ -1184,7 +1184,7 @@ proc init {{scanwidth 423}} {
 		unset var
 	}
 	array set var {
-		title "RfMon"
+		title "nRfMon"
 		version v0.5.1
 
 		B1 {}
@@ -1298,7 +1298,7 @@ proc init {{scanwidth 423}} {
 	set var(sendi,on) 0
 	buildTop
 	set var(sendi,on) $tmp
-	con "RfMon $var(version)\n(C) 2013,D.Zachariadis\nLicensed under GPLv3" 1
+	con "nRfMon $var(version)\n(C) 2013,D.Zachariadis\nLicensed under GPLv3" 1
 }
 
 # namespace ::mon
@@ -2251,9 +2251,9 @@ proc xcvrData {} {
 				cmd 0x0000
 			}
 			rfMon {
-				desc RfMon
+				desc nRfMon
 				cmd 0
-				desc {RfMon combos}
+				desc {nRfMon combos}
 				Id {desc {Node ID} type entry from 1 to 31 incr 1 width 3 units {} def 1 state disabled}
 				Ack {desc {Request ACK} type boolean units {} def 0 state disabled}
 				Zw {desc {Scan width} type entry from 1 to 3808 incr 1 units {chan} def 3808 state disabled}
