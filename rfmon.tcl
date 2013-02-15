@@ -66,6 +66,7 @@ proc bildBinds {} {
 	"
 	bind $var(top) <<PortChanged>> [list [namespace current]::onChange port %d]
 	bind $var(top) <<SettingsChanged>> [list [namespace current]::onChange %d]
+	bind $var(top) <Control-1> [list [namespace current]::zoneSelect reset]
 }
 
 # namespace ::mon
@@ -2051,6 +2052,7 @@ proc tuneHere f {
 	## tune on this point on screen
 	variable var
 	
+	if {$f < 0 || $var(wf,W) < $f} return
 	# use current bandwidth value
 	set var(xcvr,FSC,F) [scr2chan $f]
 	set var(xcvr,FSC,Freq) [scr2freq $f]
