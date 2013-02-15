@@ -1185,7 +1185,7 @@ proc init {{scanwidth 423}} {
 	}
 	array set var {
 		title "RfMon"
-		version v0.5
+		version v0.5.1
 
 		B1 {}
 		selecting 0
