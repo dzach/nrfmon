@@ -1043,7 +1043,7 @@ proc enumerate what {
 
 	switch -glob -nocase -- $what {
 		"ports" {
-			lappend out {*}[glob -nocomplain /dev/ttyUSB* /dev/ttyACM*]
+			lappend out {*}[glob -nocomplain /dev/ttyUSB* /dev/ttyACM* /dev/tty.usbserial*]
 			if {[llength $out]} {
 				set out [concat {{}} $out]
 			}
@@ -1797,7 +1797,8 @@ proc portSetup {} {
 		return
 	}
 	if {[catch {
-		set var(port) [open $var(portname) RDWR]
+    # the NONBLOCK option is required for Mac OS X
+		set var(port) [open $var(portname) {RDWR NONBLOCK}]
 	} err]} {
 		set var(scanning) 0
 		# skip toggleScan resume
@@ -1806,6 +1807,12 @@ proc portSetup {} {
 	set var(state) 1
 	# empty input buffer
 	chan config $var(port) -blocking 0 -buffering line -mode $var(portspeed),n,8,1
+  # pretty nasty stuff to avoid blocking on open or write with Mac OS X
+  if {$::tcl_platform(os) eq "Darwin"} {
+      # prevent modem control from blocking serial ouput
+      exec stty clocal <@$var(port)
+      after 1000 ;# extra delay may avoid kernel panic due to FTDI driver bug
+  }
 	read $var(port)
 	chan event $var(port) read [list [namespace current]::receive $var(port)]
 	send "v9zs\n"
