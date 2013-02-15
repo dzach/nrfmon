@@ -1,9 +1,9 @@
-RfMon
+nRfMon
 =======
 
 A software spectrum analyzer for the RFM12B transceiver module running in an Arduino.
 
-![Screenshot](https://raw.github.com/dzach/rfmon/master/images/rf12forensics.png)
+![Screenshot](https://raw.github.com/dzach/nrfmon/master/images/rf12forensics.png)
 
 Use this program to visualize what the RFM12B transceiver module hears on the 433, 868 or 915 MHz band.
 It implements some basic tools to help annotate and compare link conditions for communication between Arduinos.
@@ -24,7 +24,7 @@ Select the port where the RFM12B carrying node is commected. Automatic comms por
 /dev/ttyUSB* and /dev/ttyACM*
 
 Ready to use binaries (no need to install tcl8.6):
-*   Linux x86 : https://raw.github.com/dzach/rfmon/master/binaries/rfmon
+*   Linux x86 : https://raw.github.com/dzach/nrfmon/master/binaries/rfmon
 
 NOTE:
 
