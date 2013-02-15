@@ -100,7 +100,7 @@ static void setPower (byte patt) {
 }
 
 // turn carrier on for a number of seconds
-static void xmitOn(long on) {
+static void xmitOn(unsigned long on) {
   rf12_initialize(0, config.nodeId >> 6);
   rf12_control(config.FSC);
   rf12_control(config.TXC);
@@ -177,7 +177,7 @@ static void handleInput (char c) {
       ondur = -1;
       // signal command output
       Serial.print("<");
-      Serial.print(value,DEC);
+      Serial.print((unsigned long)value,DEC);
       Serial.print(c);
       Serial.print(" ");
       switch (c) { 
