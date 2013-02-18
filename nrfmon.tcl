@@ -1797,11 +1797,15 @@ proc portSetup {} {
 		return
 	}
 	if {[catch {
-    # the NONBLOCK option is required for Mac OS X
-		set var(port) [open $var(portname) {RDWR NONBLOCK}]
+		# the NONBLOCK option is required for Mac OS X
+		if {$::tcl_platform(os) eq "Darwin"} {
+			set var(port) [open $var(portname) {RDWR NONBLOCK}]
+		} else {
+			set var(port) [open $var(portname) RDWR]
+		}
 	} err]} {
 		set var(scanning) 0
-		# skip toggleScan resume
+		# skip caller's resume
 		return -level 2
 	}
 	set var(state) 1
