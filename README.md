@@ -18,10 +18,11 @@ The spectrum analyzer consists of two parts:
 1. A sketch that needs to be uploaded to an Arduino board equipped with an RFM12B module. 
 2. A TCL script that runs on a PC and connects the Arduino + RFM12B with the PC, presenting the user with a waterfall and spectrum plot of the frequency band in use.
 
-To use it you need to have a copy of tcl8.6 installed as well as the Arduino IDE with the JeeLibs library. The program has been tested with Linux, but should work on any platform where tcl8.6 exists. If you do not have tcl8.6 installed you can use one of the executable binaries provided below.
-Select the port where the RFM12B carrying node is commected. Automatic comms port enumeration has been set for devices in the form of:
+To use it you need to have a copy of tcl8.6 installed as well as the Arduino IDE with the JeeLibs library. The program has been tested with Linux, Mac OS and Windows and should work on any platform for which tcl/tk v8.6 exists. If you do not have tcl/tk v8.6 installed you can use one of the executable binaries provided below.
 
-/dev/ttyUSB* and /dev/ttyACM*
+Select the port where the RFM12B carrying node is commected. Automatic comms port enumeration has been set for serial communications ports in the form:
+
+/dev/ttyUSB* and /dev/ttyACM* /dev/tty.usbserial*
 
 Ready to use binaries (no need to install tcl8.6):
 *   Linux x86 : https://raw.github.com/dzach/nrfmon/master/binaries/rfmon
