@@ -25,7 +25,7 @@ Select the port where the RFM12B carrying node is commected. Automatic comms por
 /dev/ttyUSB* and /dev/ttyACM* /dev/tty.usbserial*
 
 Ready to use binaries (no need to install tcl8.6):
-*   Linux x86 : https://raw.github.com/dzach/nrfmon/master/binaries/rfmon
+*   Linux x86 : https://raw.github.com/dzach/nrfmon/master/binaries/nrfmon
 
 NOTE:
 
