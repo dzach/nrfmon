@@ -1206,6 +1206,7 @@ proc drawXmit {{delay 0}} {
 	if {$delay > 0} {
 		set var(sim,delay) [expr {$delay * 1000.0 - 100}]
 		set var(sim,timer) [after 100 [namespace current]::drawXmit [expr {$var(sim,delay) / 1000.0}]]
+		$var(scr) coords SP 0 $var(sa,base) $var(wf,W) $var(sa,base)
 	} else {
 		# draw the xmit pixels
 		$var(wfi) put $var(colors,simtx) -to $var(simlx) $r
