@@ -8,7 +8,7 @@
   Change the last part in the next line to reflect the hardware signature that'll be shown on the RfMon screen.
   The signature is a dictionary, i.e. should be pairs of key/value, where the last pair is the hardware type
 */
-#define RFMON_SIGNATURE F("xcvr rf12b ver 0.5.1 hw JeeNode.v6")
+#define RFMON_SIGNATURE F("xcvr rf12b ver 0.6a hw JeeNode.v6")
 
 //#define LED_PIN     9   // activity LED, comment out to disable
 
@@ -26,16 +26,16 @@
 // initial auto transmit delay
 #define RFMON_XDELAY 10
 
-typedef struct {
+static struct {
     byte nodeId;
     byte group;
-    byte patt;
     word FSC;
     word RCC;
     word TXC;
-} RF12Config;
+    word AFC;
+    word zone[3];
+} config;
 
-static RF12Config config;
 static byte top;
 static boolean num = false;
 static word value, stack[RF12_MAXDATA];
@@ -49,7 +49,6 @@ static long offdur = 5;
 static unsigned long xontime,xofftime;
 
 // channel limits
-static word lower = 96, upper = 3903, scale = 26;
 static byte mode = RFMON_SCAN;
 static byte rx_mode = RFMON_SCAN;
 
@@ -67,16 +66,17 @@ static void setChannel(word c) {
 }
 
 static void setRSSI(byte level) {
-  rf12_control(config.RCC | level);
+  rf12_control((config.RCC & 0xFFF8) | level);
   delayMicroseconds(1000);
 }
 
 static void scanRSSI(word lower, word upper, word stp) {
   // find amplitude of signals within the receiving band
-  for (word c = lower; c < upper; c += stp) {
+  byte lev0 = (config.RCC & 0x7);
+  for (word c = lower; c <= upper; c += stp) {
     setChannel(c);
     byte i;
-    for (i = 0; i < 8; ++i) {
+    for (i = lev0; i < 8; ++i) {
       setRSSI(i);
       if (((rf12_control(0x0000) >> 8) & 1) == 0)
         break;
@@ -84,8 +84,8 @@ static void scanRSSI(word lower, word upper, word stp) {
     if (ascart)
       Serial.print(asc[i]);
     else
-      Serial.write('0' + i);
-    // user has priority. Abort this scan
+      Serial.write('0' + (i<=lev0 ? 0:i));
+    // user has priority. Abort this scan if we have user input
     if (Serial.available()) 
       break;
   }
@@ -109,7 +109,6 @@ static void xmitOn(unsigned long on) {
     delay(1);
   rf12_onOff(0);
   rf12_config(0); // restore normal packet listening mode
-  rf12_control(config.RCC);
 }
 
 static void xmitFSK(byte c) {
@@ -125,7 +124,7 @@ static void xmitFSK(byte c) {
   delay(1);
 }
 
-static void setCmdWord(word cmd) {
+static word setCmdWord(word cmd) {
   // find a match for the command word
  if ((cmd & 0xF800) == 0x9000)
     config.RCC = cmd;
@@ -133,6 +132,9 @@ static void setCmdWord(word cmd) {
    config.TXC = cmd;
  else if ((cmd & 0xF000) == 0xA000)
     config.FSC = cmd;
+ else if ((cmd & 0xFF00) == 0xC400)
+    config.AFC = cmd;
+ return rf12_control(cmd);
 }
 
 int freeRam () {
@@ -146,19 +148,29 @@ static void printSettings (byte c) {
 
   // id, group
   if (c & RFMON_PRGID){
-    Serial.print(" i ");Serial.print(config.nodeId & 0x1F,DEC);Serial.print(" g ");Serial.print(config.group);;Serial.print(" mem ");Serial.print(freeRam());
+    Serial.print(F(" i "));Serial.print(config.nodeId & 0x1F,DEC);Serial.print(F(" g "));Serial.print(config.group);;Serial.print(F(" mem "));Serial.print(freeRam());
   }
   // band, channel, power att.
   if (c & RFMON_PRXMIT) {
-    Serial.print(" b ");Serial.print(config.nodeId >> 6, DEC);Serial.print(" c ");Serial.print(config.FSC & 0x0FFF);Serial.print(" p ");Serial.print(config.TXC & 0x07);
+    Serial.print(F(" b "));Serial.print(config.nodeId >> 6, DEC);Serial.print(F(" c "));Serial.print(config.FSC & 0x0FFF);Serial.print(F(" p "));Serial.print(config.TXC & 0x07);
   }
   // scann settings
   if (c & RFMON_PRSCAN) {
-    Serial.print(" l ");Serial.print(lower);Serial.print(" u ");Serial.print(upper);Serial.print(" z ");Serial.print(scale);
+    Serial.print(F(" s {l "));Serial.print(config.zone[0]);Serial.print(F(" u "));Serial.print(config.zone[1]);Serial.print(F(" z "));Serial.print(config.zone[2]);Serial.print(F("}"));
   }
   if (c & RFMON_PRCMDS) {  
-    Serial.print(" RCC "); Serial.print(config.RCC, HEX); Serial.print(" TXC "); Serial.print(config.TXC, HEX); Serial.print(" FSC "); Serial.print(config.FSC, HEX);
+    Serial.print(F(" RCC ")); Serial.print(config.RCC, HEX); Serial.print(F(" TXC ")); Serial.print(config.TXC, HEX); Serial.print(F(" FSC ")); Serial.print(config.FSC, HEX);
   }
+}
+
+static word readOffset() {
+  // clear AFC,en to disable AFC calculation, preventing register value changing before we read it
+  rf12_control(config.AFC & 0xFFFE);
+  // read the frequency offset from the status word
+  word st = rf12_control(0x0000); // & 0x1F;
+  // reset AFC
+  rf12_control(config.AFC);
+  return st;
 }
 
 static void handleInput (char c) {
@@ -171,12 +183,11 @@ static void handleInput (char c) {
         stack[top++] = value;
       value = 0;
     } else if ('a' <= c && c <='z') {
-      // enter rx mode mode
-      mode = rx_mode;
-      // stop auto transmit
-      ondur = -1;
+      // temporarily enter rx mode mode, but store the current mode
+      byte mode0 = mode;
+      mode = RFMON_RX;
       // signal command output
-      Serial.print("<");
+      Serial.print("< ");
       Serial.print((unsigned long)value,DEC);
       Serial.print(c);
       Serial.print(" ");
@@ -188,100 +199,118 @@ static void handleInput (char c) {
               printSettings(RFMON_PRCMDS);Serial.println();
               break;
             }
-            rf12_control(value);
-            setCmdWord(value);
-            Serial.print("0x");
-            Serial.println(value,HEX);
+            Serial.print(" r {");
+            setCmdWord(value);Serial.print("0x");Serial.print(value,HEX);
             if (top)
               for (byte i=0; i < top;  i++) {
-                rf12_control(stack[i]);
-                setCmdWord(stack[i]);
-                Serial.print("0x");
-                Serial.println(stack[i],HEX);
+                 setCmdWord(stack[i]);Serial.print(" 0x");Serial.print(value,HEX);
               }
+            Serial.println(" }");
+            mode = mode0;
             break;
           case 'b': // set band: 1 = 433, 2 = 868, 3 = 915
-
-              if (RF12_433MHZ <= value && value <= RF12_915MHZ) {
-                config.nodeId = (config.nodeId & 0x3F) + (value << 6);
-              }
-              printSettings(RFMON_PRXMIT); Serial.println();
-              break;
+            if (num && RF12_433MHZ <= value && value <= RF12_915MHZ) {
+              config.nodeId = (config.nodeId & 0x3F) + (value << 6);
+            }
+            printSettings(RFMON_PRXMIT); Serial.println();
+            break;
           case 'c': // set frequency channel
-              if (96 <= value && value <= 3903) {
-                config.FSC = 0xA000 | value;
-                rf12_control(config.FSC);
-              }
-              printSettings(RFMON_PRXMIT); Serial.println();
-              break;
+            if (96 <= value && value <= 3903) {
+              config.FSC = 0xA000 | value;
+              rf12_control(config.FSC);
+            }
+            printSettings(RFMON_PRXMIT); Serial.println();
+            // go back to the mode we were before we got user input
+            mode = mode0;
+            break;
           case 'i': // set node id
-              if (value) {
-                config.nodeId = (config.nodeId & 0xE0) + (value & 0x1F);
-              }
-              printSettings(RFMON_PRGID); Serial.println();
-              break;
+            if (value) {
+              config.nodeId = (config.nodeId & 0xE0) + (value & 0x1F);
+            }
+            printSettings(RFMON_PRGID); Serial.println();
+            mode = mode0;
+            break;
           case 'g': // set network group
-              config.group = value;
-              printSettings(RFMON_PRGID); Serial.println();
-              break;
-          case 'l': // set low freq for scanning
-              lower = (value < 96 ? 96 : value > (upper - RFMON_MINBW) ? (upper - RFMON_MINBW) : value);
-              mode = RFMON_RX;
-              printSettings(RFMON_PRSCAN);Serial.println();
-              break;
-          case 'u': // set low freq for scanning
-              upper = (value > 3903 ? 3903 : value < (lower + RFMON_MINBW) ? (lower + RFMON_MINBW) : value);
-              mode = RFMON_RX;
-              printSettings(RFMON_PRSCAN);Serial.println();
-              break;
-          case 'z': // set step for scanning
-              scale = (value <= 0 ? scale : value);
-              mode = RFMON_RX;
-              printSettings(RFMON_PRSCAN);Serial.println();
-              break;
-          case 'p': // set xmit power level
-              if (num) {
-                config.TXC = config.TXC & 0xFFF8 | (value > 7 ? 7 : value);
-              }
-              printSettings(RFMON_PRXMIT); Serial.println();
-              break;
-          case 'x': // turn on transmitter for value seconds
-              if (!value)
-                value = 5;
-              // if there are more parameters to the x command, then turn on auto transmit mode
-              switch (top) {
-                case 0: // transmit continuous carrier for a time period and stop
-                  mode = RFMON_XCW;
-                  offdur = 0;
-                  break;
-                case 1: // transmit CW for a time period
-                  offdur = stack[0];
-                  mode = RFMON_XCW;
-                  break;
-                default:  // transmit fsk packets for a time period
-                  fsk = stack[top-2];
-                  offdur = stack[top-1];
-                  mode = RFMON_XFSK;
-                  break;
-             }
-             ondur = value;
-             Serial.print("x {");Serial.print(ondur); Serial.print(" "); Serial.print(offdur); Serial.print("}");
-             if (mode == RFMON_XFSK) {
-               Serial.print(" fsk 0x");Serial.print(fsk,HEX);
-             }
-             Serial.println();
-             break;
-           case 's': // turn on scan mode
-              ascart = value;
+            config.group = value;
+            printSettings(RFMON_PRGID); Serial.println();
+            mode=mode0;
+            break;
+          case 's': // set scan limits
+            for (byte i=0; i<top; i++)
+              config.zone[i] = stack[i];
+            if (value)
               mode = rx_mode = RFMON_SCAN;
-              printSettings(RFMON_PRSCAN);Serial.println();
-              break;
+            else
+              mode = rx_mode = RFMON_RX;
+            // swap lower with upper if necessary
+            if (config.zone[0] > config.zone[1]) {
+              word tmp = config.zone[0]; config.zone[0] = config.zone[1]; config.zone[1] = tmp;
+            }
+            // apply RFM12B hard limits to zone
+            if (config.zone[0] < 96) config.zone[0] = 96;
+            if (config.zone[1] > 3903) config.zone[1] = 3903;
+            printSettings(RFMON_PRSCAN);Serial.println();
+            break;
+          case 'p': // set xmit power level
+            if (num) {
+              config.TXC = (config.TXC & 0xFFF8 | (value > 7 ? 7 : value));
+            }
+            printSettings(RFMON_PRXMIT); Serial.println();
+            mode = mode0;
+            break;
+          case 'x': // turn on transmitter for value seconds
+            if (!value) {
+              if (!num)
+                value = 5;
+              else { // 0x : stop the transmitter
+                mode = rx_mode;
+                break;
+              }
+            }
+            // if there are more parameters to the x command, then turn on auto transmit mode
+            switch (top) {
+              case 0: // transmit continuous carrier for a time period and stop
+                mode = RFMON_XCW;
+                offdur = 0;
+                break;
+              case 1: // transmit CW for a time period
+                offdur = stack[0];
+                mode = RFMON_XCW;
+                break;
+              default:  // transmit fsk packets for a time period
+                fsk = stack[top-2];
+                offdur = stack[top-1];
+                mode = RFMON_XFSK;
+                break;
+            }
+            ondur = value;
+            Serial.print("x {");Serial.print(ondur); Serial.print(" "); Serial.print(offdur); Serial.print("}");
+            if (mode == RFMON_XFSK) {
+              Serial.print(" fsk 0x");Serial.print(fsk,HEX);
+            }
+            Serial.println();
+            break;
+          case 'a': // turn on scan mode
+            ascart = value;
+            mode = rx_mode = RFMON_SCAN;
+            printSettings(RFMON_PRSCAN);Serial.println();
+            break;
           case 'v': // user asks for the identification string, send out all settings too
-              Serial.print(RFMON_SIGNATURE); printSettings(RFMON_PRGID | RFMON_PRXMIT | RFMON_PRSCAN); Serial.println();
-              break;
+            mode = RFMON_RX;
+            Serial.print(RFMON_SIGNATURE); printSettings(RFMON_PRGID | RFMON_PRXMIT | RFMON_PRSCAN); Serial.println();
+            break;
+          case 'o': // read frequency offset
+            // exhaust input
+            while (Serial.available())
+              Serial.read();
+            Serial.print("o ");Serial.println(readOffset(),DEC);
+            break;
           default:
               break;
         }
+        // if we are in receive mode xmit on duration should be 0
+        if (mode == RFMON_RX || mode == RFMON_SCAN)
+          ondur = 0;
         value = top = num = 0;
         memset(stack, 0, sizeof stack);
     }
@@ -292,14 +321,19 @@ void setup () {
   Serial.begin(57600);
   Serial.println(RFMON_SIGNATURE);
 
-  // initialize confi structure
+  // initialize node, band and group
   config.nodeId = 0x81; // 868 MHz, node 1
   config.group = 0x00;  // default group 0
+  // set defaults
+  rf12_initialize(config.nodeId, config.nodeId >> 6, config.group);
+  // set the rest of the config structure
   config.RCC = 0x94C0;  // Pin16 = VDI, VDIresp = fast, BW = 67kHz, LNAGain = 0dB; RSSIthreshold = -103 dBm
   config.FSC = 0xA000 | 1600;   // mid band channel
   config.TXC = 0x9807;  // FSK = 15kHz, Pwr = -17.5dB, FSK shift = positive
-  // set defaults
-  rf12_config(0);
+  config.AFC = 0xC487;  // AFC follow VDI, no limit, !st, !fi,oe,en 
+  config.zone[0] = 96;
+  config.zone[1] = 3903;
+  config.zone[2] = 9;
   xontime = millis() + RFMON_XDELAY * 1000;
   mode = RFMON_XCW;
 }
@@ -311,7 +345,7 @@ void loop () {
     handleInput(Serial.read());
   }
   // check if its time to turn on auto transmit
-  if (ondur >= 0) {
+  if (ondur > 0) {
     // start transmitting if time has come
     if (millis() > xontime) {
       // calculate when to stop transmitting
@@ -320,14 +354,21 @@ void loop () {
         xmitOn(ondur * 1000);
       else
         xmitFSK(fsk);
-      if (!offdur) // just one shot, then we are done with this transmission
-        ondur = -1;
-      else 
+      // an offdur of 0 means we will fire just one shot
+      // and then we are done with this transmission
+      if (offdur == 0) {
+        ondur = 0;
+        mode = rx_mode;
+      }
+      else {
         // repeat on/off sequence
         xontime = millis() + offdur * 1000;
+      }
+      // notify user
+      Serial.print("< ");Serial.print(ondur);Serial.print("x");printSettings(RFMON_PRCMDS | RFMON_PRXMIT);Serial.println();
     }
   }
   else if (mode == RFMON_SCAN) {
-    scanRSSI(lower, upper, scale);
+    scanRSSI(config.zone[0], config.zone[1], config.zone[2]);
   }
 }
