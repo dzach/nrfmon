@@ -13,6 +13,17 @@
 #		2. Connected, Scanning
 #		3. Receiving data
 #		4. Transmitting
+#	Special symbols used:
+#	●\u25CF	Anouncement
+#	■\u25A0	
+#	♦\u2666	
+#	█\u2588	Error
+#	▼\u25BC	
+#	▲\u25B2	
+#	►\u25BA	prompt
+#	◄\u25C4	
+#	ϟ\u03DF	user action
+#
 
 proc ::init {} {
 	if {[catch {
@@ -749,7 +760,7 @@ proc colors {colors args} {
 proc con {s {check 0}} {
 	variable var
 
-	if {! $var(traffic,on) && [string index $s 0] in {> < ► ϟ}} {
+	if {! $var(traffic,on) && [string index $s 0] in "> < \u25BA \u03df"} {
 		return
 	}
 	$var(con) insert end-1line "$s\n"
@@ -1511,7 +1522,7 @@ proc init {{scanwidth 423}} {
 	createExpColors
 	set var(sendi,on) $tmp
 	# show license and copyright 
-	con "● nRfMon $var(version)\n(C) 2013,D.Zachariadis\nLicensed under the GPLv3" ; prompt
+	con "\u25cf nRfMon $var(version)\n(C) 2013,D.Zachariadis\nLicensed under the GPLv3 [encoding system]" ; prompt
 	trace variable [namespace current]::var(state) w [namespace current]::onStateChange
 }
 
@@ -1744,7 +1755,7 @@ proc onConKey {key s} {
 					}
 					set var(history,idx) [llength $var(history)]
 				}
-				$var(con) insert end "\n► "
+				$var(con) insert end "\n\u25BA "
 				parseConCmd $in
 				$var(con) see end
 				$var(con) mark set insert end-1c
@@ -1905,7 +1916,6 @@ proc onPanelEvent args {
 # namespace ::mon
 proc onStateChange args {
 	# disable trace
-	# ●♦█▼▲►◄ϟ
 	trace remove var [namespace current]::var(state) write [namespace current]::onStateChange
 	variable var
 #puts [caller]\t$var(state0)->$var(state)\t$var(statemsg)
@@ -1934,7 +1944,7 @@ proc onStateChange args {
 			if {[string match "but*" $var(statemsg)]} {
 				# indicate failure to get xcvr id
 				$var(port,wg) configure -style red.TCombobox
-				con "█ $var(statemsg)"
+				con "\u2588 $var(statemsg)"
 				con ". Connected"
 			} else {
 				con ". Connected $var(statemsg)"
@@ -1943,7 +1953,7 @@ proc onStateChange args {
 		2 - 3 {
 			set var(rxstate) $var(state)
 			if {$var(state0) == 1} {
-				con "● [dict get $var(xcvr,data) hw] live"
+				con "\u25cf [dict get $var(xcvr,data) hw] live"
 			}
 			if {[llength $var(statemsg)]} {
 				con $var(statemsg)
@@ -2116,7 +2126,7 @@ proc portSetup {{what {}}} {
 	}
 	if {[string match "disc*" $var(portname)] || ![llength $var(portname)]} {
 		set var(portname) {}
-		con "ϟ Disconnect"
+		con "\u03df Disconnect"
 		setState 0
 		return
 	}
@@ -2148,7 +2158,7 @@ proc portSetup {{what {}}} {
 	send "v9,1s"
 	set var(concnt) 4
 	set var(afteropen) [after $var(contimeout) [namespace current]::xcvrGetId]
-	con "ϟ Connect ($var(portname))"
+	con "\u03df Connect ($var(portname))"
 	setState 1
 }
 
@@ -2171,7 +2181,7 @@ proc prompt {} {
 	variable var
 
 	$var(con) mark set insert end-1c
-	$var(con) insert end "► "
+	$var(con) insert end "\u25BA "
 	set var(con,inputLine) [expr {int([$var(con) index end-1c])}]
 	$var(con) see end
 }
@@ -2270,7 +2280,7 @@ proc send s {
 		con "> $s"
 		return 1
 	} on error err {
-		setState 0 "█ Cannot transmit. Please choose a proper serial port."
+		setState 0 "\u2588 Cannot transmit. Please choose a proper serial port."
 		return 0
 	}
 }
@@ -2420,17 +2430,17 @@ proc simTxTimer {{delay 0}} {
 proc toggleScan {} {
 	variable var
 	if {$var(state) < 2} {
-		con "█ Not connected"
+		con "\u2588 Not connected"
 		set var(scanning) "Scan"
 		return
 	}
 	# toggle state
 	if {$var(state) > 2} {
-		setState 2 "ϟ Scan"
+		setState 2 "\u03df Scan"
 		send "1s"
 		$var(scanb) configure -text "Stop"
 	} else {
-		setState 3 "ϟ Stop scanning"
+		setState 3 "\u03df Stop scanning"
 		send "0s"
 		$var(scanb) configure -text "Scan"
 	}
@@ -2666,7 +2676,7 @@ proc xcvrGetId {} {
 		set var(afteropen) [after $var(contimeout) [namespace current]::xcvrGetId]
 	} else {
 		set var(hw) {}
-		con "█ No hw Id"
+		con "\u2588 No hw Id"
 		setState 0 
 		event generate $var(top) <<PortChanged>> -data noId
 	}
@@ -2751,7 +2761,7 @@ proc xmit {{what {}}} {
 	# transmit button pressed
 	if {$var(state) == 4} {
 		# we are currently transmitting, so stop the transmitter
-		con "ϟ Stop transmit"
+		con "\u03df Stop transmit"
 		setState {} ; # empty string resets previous state
 		if {$var(rxstate) == 3} {
 			send 0s
@@ -2772,7 +2782,7 @@ proc xmit {{what {}}} {
 	} else {
 		set fsksymb ""
 	}
-	con "ϟ Transmit"
+	con "\u03df Transmit"
 	set s $var(xcvr,FSC,F)c[join "$fsksymb $offdur $ondur" ,]x
 	if {[send $s]} {
 		setState 4
