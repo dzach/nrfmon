@@ -1522,7 +1522,7 @@ proc init {{scanwidth 423}} {
 	createExpColors
 	set var(sendi,on) $tmp
 	# show license and copyright 
-	con "\u25cf nRfMon $var(version)\n(C) 2013,D.Zachariadis\nLicensed under the GPLv3 [encoding system]" ; prompt
+	con "\u25cf nRfMon $var(version)\n(C) 2013,D.Zachariadis\nLicensed under the GPLv3" ; prompt
 	trace variable [namespace current]::var(state) w [namespace current]::onStateChange
 }
 
