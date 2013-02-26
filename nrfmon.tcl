@@ -23,7 +23,6 @@
 #	►\u25BA	prompt
 #	◄\u25C4	
 #	ϟ\u03DF	user action
-#	Δ\u0394
 #
 
 proc ::init {} {
@@ -2558,7 +2557,7 @@ proc xcvrData {} {
 				desc {4. Data Rate}
 				cmd 0xC600 
 				R {desc {Rate setting (R)} lsb 0 type scalar from 0 to 127 incr 1 units {} def 35 format %0.0f width 4 deps {DRC,BR DRC,Cs}}
-				Cs {desc {Prescaler ÷8 (Cs)} lsb 7 type boolean opts {0 1} units {} def 0 }
+				Cs {desc {Prescaler \u00F78 (Cs)} lsb 7 type boolean opts {0 1} units {} def 0 }
 				BR {desc {Bit Rate (BR)} type entry from 0.337 to 344.827 incr 1.0 incr 0.5 units kbps def 9.5790 format %0.3f  deps {DRC,R DRC,Cs}}
 				DBR {desc \u0394BR deps {} type function from 0.0 to 100.0 format %0.3f units kbps def 0 format %0.3f}
 			}
