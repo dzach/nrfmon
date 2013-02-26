@@ -2201,10 +2201,80 @@ proc quit {} {
 proc receive port {
 	variable var
 
-	if {![gets $port var(scandata)] || ![string length $var(scandata)]} {
+	if {[catch {
+		gets $port var(scandata)
+	} err]} {
+		setState 0 $err
 		return
 	}
-	xcvrParseResp
+	if {![string length $var(scandata)]} return
+
+	if {[lindex $var(scandata) 0] eq "<"} {
+		con $var(scandata)
+		# make sure we can assign incoming data to a dict
+		if {!([llength $var(scandata)] % 2)} {
+			set var(xcvr,data) [dict merge $var(xcvr,data) $var(scandata)]
+		}
+		set cmd [lindex $var(scandata) 1]
+		switch -glob -- $cmd {
+			"*s" {
+				if {$cmd eq "0s"} {
+					setState 3
+				} else {
+					setState 2
+				}
+				# sync gui screen settings with xcvr scan settings
+				scanSync
+				# sync nRfMon with xcvr settings 
+				monSync
+			}
+			"*v" {
+				# firmware signatiure, always puts us in a known state, scanning
+				setState 3
+				after cancel $var(afteropen)
+				monSync
+				event generate $var(top) <<PortChanged>> -data conn
+			}
+			"0x" {
+				# transmitter is off
+				setState $var(rxstate)
+			}
+			"*x" {
+				setState 4
+				monSync
+				if {$var(state) == 4 && [dict exists $var(scandata) TXC]} {
+					# calculate tx bandwidth
+					set dfsk 0x[dict get $var(scandata) TXC]
+					dict set var(xcvr,data) dfsk [expr {15*((($dfsk & 0x00f0) >> 4) + 1)}]
+				}
+				drawXmit [lindex [dict get $var(xcvr,data) x] 1]
+			}
+			"0o" {
+				# this is the status word
+				set status [expr {[dict get $var(scandata) o]}]
+				set PLLstep [dict get $mon::var(rf12b) bands [dict get $mon::var(xcvr,data) b] PLLstep]
+				set offset [expr {(((($status & 0x10)>>4) ? -16 : 0) + ($status & 0xF)) * $PLLstep}]
+				lappend var(offs) $offset
+				set var(offs) [lrange $var(offs) end-10 end]
+#				puts [decodeStatus $status]\tFoff\t$offset ;#[expr {round([avgList $var(offs)])}]
+			}
+			default {
+				if {[llength $var(scandata)] > 2} {
+					monSync
+					return
+				}
+			}
+		}
+	} elseif {[string length $var(scandata)] > 0} {
+		if {$var(r) < $var(wf,H)} {
+			incr var(r)
+		} else {
+			set var(r) 0
+		}
+		set var(clock,$var(r)) [clock milli]
+		set var(scandata) [split $var(scandata) ""]
+		drawScanline
+	}
 }
 
 # namespace ::mon
@@ -2680,78 +2750,6 @@ proc xcvrGetId {} {
 		con "\u2588 No hw Id"
 		setState 0 
 		event generate $var(top) <<PortChanged>> -data noId
-	}
-}
-
-# namespace ::mon
-proc xcvrParseResp {} {
-	variable var
-
-	if {[lindex $var(scandata) 0] eq "<"} {
-		con $var(scandata)
-		# make sure we can assign incoming data to a dict
-		if {!([llength $var(scandata)] % 2)} {
-			set var(xcvr,data) [dict merge $var(xcvr,data) $var(scandata)]
-		}
-		set cmd [lindex $var(scandata) 1]
-		switch -glob -- $cmd {
-			"*s" {
-				if {$cmd eq "0s"} {
-					setState 3
-				} else {
-					setState 2
-				}
-				# sync gui screen settings with xcvr scan settings
-				scanSync
-				# sync nRfMon with xcvr settings 
-				monSync
-			}
-			"*v" {
-				# firmware signatiure, always puts us in a known state, scanning
-				setState 3
-				after cancel $var(afteropen)
-				monSync
-				event generate $var(top) <<PortChanged>> -data conn
-			}
-			"0x" {
-				# transmitter is off
-				setState $var(rxstate)
-			}
-			"*x" {
-				setState 4
-				monSync
-				if {$var(state) == 4 && [dict exists $var(scandata) TXC]} {
-					# calculate tx bandwidth
-					set dfsk 0x[dict get $var(scandata) TXC]
-					dict set var(xcvr,data) dfsk [expr {15*((($dfsk & 0x00f0) >> 4) + 1)}]
-				}
-				drawXmit [lindex [dict get $var(xcvr,data) x] 1]
-			}
-			"0o" {
-				# this is the status word
-				set status [expr {[dict get $var(scandata) o]}]
-				set PLLstep [dict get $mon::var(rf12b) bands [dict get $mon::var(xcvr,data) b] PLLstep]
-				set offset [expr {(((($status & 0x10)>>4) ? -16 : 0) + ($status & 0xF)) * $PLLstep}]
-				lappend var(offs) $offset
-				set var(offs) [lrange $var(offs) end-10 end]
-#				puts [decodeStatus $status]\tFoff\t$offset ;#[expr {round([avgList $var(offs)])}]
-			}
-			default {
-				if {[llength $var(scandata)] > 2} {
-					monSync
-					return
-				}
-			}
-		}
-	} elseif {[string length $var(scandata)] > 0} {
-		if {$var(r) < $var(wf,H)} {
-			incr var(r)
-		} else {
-			set var(r) 0
-		}
-		set var(clock,$var(r)) [clock milli]
-		set var(scandata) [split $var(scandata) ""]
-		drawScanline
 	}
 }
 
