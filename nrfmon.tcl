@@ -1123,6 +1123,9 @@ proc drawScanline {} {
 	# since there will be no signal drawn on screen, avoid the devision by 0 error by setting maxavg to 1
 	if {! $maxavg} {set maxavg 1}
 	# calculate the average signal for the RX BW
+	if {$sig eq {}} {
+		set sig 0
+	}
 	set var(sig,$var(r)) [avgList $sig]
 	# plot avg spectrum line
 	set coords [list $var(scan,start) $var(sa,base)]
