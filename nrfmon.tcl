@@ -2067,7 +2067,7 @@ proc onStateChange args {
 	}
 	switch -- $var(state) {
 		0 {
-			if {[llength $var(statemsg)]} {
+			if {[string trim $var(statemsg)] ne ""} {
 				con $var(statemsg)
 			}
 			con ". Disconnected"
@@ -2088,7 +2088,7 @@ proc onStateChange args {
 			if {$var(state0) == 1} {
 				con "\u25cf [dict get $var(xcvr,data) hw] live"
 			}
-			if {[llength $var(statemsg)]} {
+			if {[string trim $var(statemsg)] ne ""} {
 				con $var(statemsg)
 			} elseif {$var(state) == 2} {
 				con  ". Scanning"
@@ -2102,7 +2102,7 @@ proc onStateChange args {
 			}
 		}
 		4 {
-			if {[llength $var(statemsg)]} {
+			if {[string trim $var(statemsg)] ne ""} {
 				con $var(statemsg)
 			} elseif {$var(state0) != 4} {
 				con  ". Transmiting"
