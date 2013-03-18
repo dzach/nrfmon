@@ -3,7 +3,12 @@ nRfMon
 
 A software spectrum analyzer for the RFM12B transceiver module running in an Arduino.
 
-![Screenshot](https://raw.github.com/dzach/nrfmon/master/images/rf12forensics.png)
+![Screenshot](https://raw.github.com/dzach/nrfmon/master/images/nrfmon_scan.png)
+Scan mode
+
+![Screenshot](https://raw.github.com/dzach/nrfmon/master/images/nrfmon_BERT.png)
+Bit Error Rate mode
+
 
 Use this program to visualize what the RFM12B transceiver module hears on the 433, 868 or 915 MHz band.
 It implements some basic tools to help annotate and compare link conditions for communication between Arduinos.
