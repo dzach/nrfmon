@@ -32,6 +32,7 @@ proc ::init {} {
 		exit
 	}
 	wm withdraw .
+	cd [file dir [info script]]
 }
 #
 init
@@ -39,13 +40,19 @@ init
 namespace eval ::mon {
 
 # namespace ::mon
-proc avgList list {
-	if {![llength $list]} {return 0}
-	expr double([join $list +])/[llength $list]
+proc advanceLine {} {
+	variable var
+	set var(r) [expr {($var(r) + 1) % $var(wf,H)}]
+	$var(wfi) put #000 -to 0  $var(r) $var(wf,W) $var(r)
 }
 
 # namespace ::mon
-proc bildBinds {} {
+proc avgList list {
+	expr double([::tcl::mathop::+ {*}$list])/[llength $list]
+}
+
+# namespace ::mon
+proc buildBinds {} {
 	variable var
 	set W $var(scr)
 
@@ -232,11 +239,11 @@ proc buildColorField {W field desc} {
 	variable var
 	
 	lassign [split [string tolower $field] ,] f f t
-	set t [string range $t 0 2]
+#	set t [string range $t 0 2]
 	pack [set w [::ttk::frame $W.${t}[string index $f 0]f]] -side top -anchor nw -fill x
 	pack [::ttk::label $w.${t}l -text $desc] -side left -anchor w -fill x -expand 1
-	pack [::ttk::entry $w.${t}e -width 7 -textvariable [namespace current]::var($field)] -side left
-	bind $w.${t}e <Key> [list [namespace current]::onMonEntry %W %K]
+	set var(tmp,$field) $var($field)
+	pack [::ttk::entry $w.${t}e -width 7 -textvariable [namespace current]::var(tmp,$field) -validate key -validatecommand [list [namespace current]::onMonEntry %W %P]] -side left
 }
 
 # namespace ::mon
@@ -265,7 +272,6 @@ proc buildCon W {
 proc buildControls W {
 	variable var
 
-	set lfpack {-side top -fill x -pady 0 -anchor nw}
 	# create controls
 	pack [::ttk::frame $W.pf] -fill x
 	pack [::ttk::label $W.pf.portl -text "Port:" -padding 0] -anchor w -side left
@@ -279,11 +285,25 @@ proc buildControls W {
 	bind $W.portcb <KP_Enter> [namespace current]::portSetup
 	
 	pack [set w [::ttk::frame $W.scf -padding {2 5}]] -anchor nw
-	pack [set var(scanb) [::ttk::checkbutton $w.scanb -style bold.TButton -text "Scan" -textvariable [namespace current]::var(scanning) -variable [namespace current]::var(scanning) -onvalue "Stop" -offvalue "Scan" -command [namespace current]::toggleScan -width 8 -padding {0 3}]] -anchor w -fill x -side left -padx 2
-	pack [::ttk::button $w.clrb -text "Clear" -command [list [namespace current]::clear screen] -width 12 -padding {0 4}] -anchor w -fill x -side left -padx 1
+	pack [set ww [::ttk::frame $w.row1 -padding {0 2}]] -anchor nw
+	pack [set var(scanb) [::ttk::radiobutton $ww.scanb -style bold.TButton -text "Scan" -variable [namespace current]::var(bstate) -value "2" -command [namespace current]::toggleCmdButton -width 8 -padding {0 3}]] -anchor w -fill x -side left -padx 2
+	pack [set var(lisnb) [::ttk::radiobutton $ww.lisnb -style bold.TButton -text "Listen" -variable [namespace current]::var(bstate) -value "3" -command [namespace current]::toggleCmdButton -width 8 -padding {0 3}]] -anchor w -fill x -side left -padx 2
+
+	pack [set ww [::ttk::frame $w.row2 -padding {0 2}]] -anchor nw
+	pack [set var(xmitb) [::ttk::radiobutton $ww.bertb -style bold.TButton -text "Xmit" -variable [namespace current]::var(bstate) -value "4" -command [namespace current]::toggleCmdButton -width 8 -padding {0 3}]] -anchor w -fill x -side left -padx 2
+	pack [::ttk::checkbutton $ww.pausrb -text "Pause Rx" -style norm.TButton -variable [namespace current]::var(pause,on) -width 11 -padding {1 4} -command "
+		[namespace current]::Pause $ww.pausrb
+	"] -anchor w -fill x -side left -padx 2
+	
+	pack [set ww [::ttk::frame $w.row3 -padding {0 2}]] -anchor nw
+	set var(quietrb) $ww.quietrb
+	pack [::ttk::checkbutton $ww.quietrb -text "Quiet Rx" -style norm.TButton -padding {1 2} -variable [namespace current]::var(quiet,on) -width 11 -command "
+		[namespace current]::setQuiet $ww.quietrb
+	"] -anchor w -fill x -side left -padx 2
+	pack [::ttk::button $ww.clrb -text "Clear scr" -command [list [namespace current]::clear screen] -width 11 -padding {1 2}] -anchor w -fill x -side left -padx 2
 
 	set w [::ttk::labelframe $W.spf -text "Spectrum:" -padding {5 2}]
-	pack $w {*}$lfpack
+	pack $w -side top -fill x -pady 0 -anchor nw
 	pack [set f [::ttk::frame $w.cstf]] -fill x
 	pack [::ttk::checkbutton $f.alcb -text "Auto contrast" -onvalue on -offvalue off -variable [namespace current]::var(alc,on) -command "
 		if {\$[namespace current]::var(evealc,on)} {
@@ -295,8 +315,8 @@ proc buildControls W {
 	pack [::ttk::spinbox $f.csts -width 3 -from 0.1 -to 5.0 -incr 0.1 -textvariable [namespace current]::var(xcvr,nRfMon,Cst)] -side left -anchor w
 	set wf [::ttk::frame $w.f1]
 	pack $wf -anchor w -fill x
-	pack [::ttk::label $wf.avgsl -text "Avereging samples:" -padding 0] -anchor w -side left
-	pack [::ttk::spinbox $wf.avgsb -width 2 -from 1 -to 99 -increment 1 -textvariable [namespace current]::var(spec,avgln)] -anchor e -side right
+	pack [::ttk::label $wf.avgsl -text "Spectrum averaging:" -padding 0] -anchor w -side left
+	pack [::ttk::spinbox $wf.avgsb -width 3 -from 1 -to 99 -increment 1 -textvariable [namespace current]::var(spec,avgln)] -anchor e -side right
 	pack [::ttk::frame $w.mxf] -anchor w
 	pack [::ttk::checkbutton $w.mxf.pkcb -text "Show peak" -width 10 -padding 0 -variable [namespace current]::var(peak,on) -command "
 		if {\$[namespace current]::var(peak,on)} {
@@ -325,7 +345,7 @@ proc buildControls W {
 	pack [::ttk::radiobutton $w.zo.zorb -text "Zone" -value 3 -width $wdth -padding {8 0} -variable [namespace current]::var(sl,on)] -anchor w -side left
 
 	set w $W.mrkf
-	pack [::ttk::labelframe $w -text "Marks:" -padding {5 2}] {*}$lfpack
+	pack [::ttk::labelframe $w -text "Marks:" -padding {5 2}] -side top -fill x -pady 5 -anchor nw
 	pack [::ttk::checkbutton $w.mklncb -text "Show mark lines" -variable [namespace current]::var(marklines,on) -command "
 		if {\$[namespace current]::var(marklines,on)} {
 			$var(scr) itemconfig Ml -state normal
@@ -336,21 +356,13 @@ proc buildControls W {
 	pack [::ttk::label $w.automl -text "Auto mark changes of:" -padding {0 0}] -anchor nw
 	pack [::ttk::checkbutton $w.pchcb -text "transceiver settings" -variable [namespace current]::var(evepch,on) -padding {15 0}] -anchor w
 	pack [::ttk::checkbutton $w.alccb -text "auto contrast setting" -variable [namespace current]::var(evealc,on) -padding {15 0}] -anchor w
-	set w $W.fcmd
-	pack [::ttk::labelframe $w -text "Transceiver settings:" -padding {5 2}] {*}$lfpack
-	pack [::ttk::checkbutton $w.sglcb -text "Set on change" -padding 0 -variable [namespace current]::var(sendi,on)] -anchor w
-	pack [::ttk::frame $w.sndf] -fill x -pady 3
-	pack [::ttk::button $w.sndf.sndb -text "Set" -padding {0 3} -width 8 -state disabled -style bold.TButton -command "
-	"] -anchor w -padx 0 -pady 0 -side left
-	pack [::ttk::button $w.sndf.prnb -text "Print" -padding {0 4} -width 8 -command "
-		[namespace current]::print
-	"] -anchor w -padx 5 -pady 0 -side left
-	buildXmit $W
 	buildCon $W
 }
 
 # namespace ::mon
 proc buildImages {} {
+	variable var
+
 	# create event deleting widget image
 	catch {image delete [namespace current]::x_img}
 	image create photo [namespace current]::x_img -data {
@@ -454,9 +466,8 @@ proc buildQuickSettings W {
 	set x 0
 	foreach {t fs} {
 		Receiver {FSC,Freq FSC,F CSC,FB RCC,BW RCC,LNA RCC,RSSI}
-		Transmitter {TXC,Pwr TXC,M DRC,R DRC,BR DRC,DBR PLL,Bw0 }
-		{Data filter & AFC} {DFC,Al DFC,Ml DFC,DQD AFC,A AFC,Rl AFC,Fi}
-		nRfMon {nRfMon,Id SP,B nRfMon,Ack nRfMon,Zw}
+		Transmitter {TXC,Pwr TXC,M DRC,R DRC,BR }
+		{AFC} {AFC,A AFC,Rl AFC,Fi}
 	} {
 		## create a container for the fields
 		place [set lf [::ttk::frame $w.f$i-$x -borderwidth 1 -relief ridge -padding 5]] -x $x -y 0 -width 210 -height 132
@@ -467,6 +478,14 @@ proc buildQuickSettings W {
 		}
 		incr x 210
 	}
+	place [set lf [::ttk::frame $w.f$i-$x -borderwidth 1 -relief ridge -padding 5]] -x $x -y 0 -width 210 -height 132
+	set w $lf.txset
+	pack [::ttk::frame $w -padding 0] -side top -fill x
+	pack [::ttk::checkbutton $w.sglcb -text "Set xcvr immediately" -padding 0 -variable [namespace current]::var(sendi,on)] -anchor w
+	pack [::ttk::frame $w.sndf] -fill x -pady 3
+	pack [::ttk::button $w.sndf.prnb -text "Print RFM12B cmds" -padding {4 4} -command "
+		[namespace current]::print
+	"] -anchor w -padx 5 -pady 0 -side left
 }
 
 # namespace ::mon
@@ -475,7 +494,7 @@ proc buildRfMonSettings W {
 	
 	set f [::ttk::frame $W.rfmf -padding 0]
 	$W add $f -text "nRfMon settings"
-	set width 160
+	set width 168
 	set x 0
 	place [set ff [::ttk::frame $f.wff -borderwidth 1 -relief ridge -padding 5]] -x [expr {$width * $x}] -y 0 -width $width -height 132
 	
@@ -513,8 +532,32 @@ proc buildRfMonSettings W {
 
 	foreach {field desc} {
 		color,fill,SPM "Hold max:"
-		color,fill,SZ "Scan zone"
-		color,outline,maxrssir "Peak marker"
+		color,fill,SZ "Scan zone:"
+		color,outline,maxrssir "Peak marker:"
+		color,outline,xmit "Xmit outline:"
+		color,fill,xmit "Xmit fill:"
+		color,fill,PER "BER line:"
+	} {
+		buildColorField $ff $field $desc
+	}
+	incr x
+	place [set ff [::ttk::frame $f.ber -borderwidth 1 -relief ridge -padding 5]] -x [expr {$width * $x}] -y 0 -width $width -height 132
+
+	foreach {field desc} {
+		color,fill,ber000 "BER 0:"
+		color,fill,ber001 "BER 1:"
+		color,fill,ber010 "BER crc 0:"
+		color,fill,ber011 "BER crc 1:"
+		color,fill,ber100 "BER err. 0:"
+		color,fill,ber101 "BER err. 1:"
+	} {
+		buildColorField $ff $field $desc
+	}
+	incr x
+	place [set ff [::ttk::frame $f.rest -borderwidth 1 -relief ridge -padding 5]] -x [expr {$width * $x}] -y 0 -width $width -height 132
+
+	foreach {field desc} {
+		color,fill,mspl "Data text color:"
 	} {
 		buildColorField $ff $field $desc
 	}
@@ -550,15 +593,96 @@ proc buildScreen W {
 	# create the specraline 
 	$W create line 0 0 0 0 -fill $var(color,fill,SL) -tags {SL fx NO}
 	drawScreen $W
+	drawBER $W
 }
 
 # namespace ::mon
 proc buildSettings W {
 	variable var
 
-	::ttk::frame $W.f
-	$W add $W.f -text "Transceiver settings"
-	set w $W.f
+	buildXcvrSettings $W
+	buildQuickSettings $W
+	buildRfMonSettings $W
+	# select the 'quick settings' panel
+	$W select 1
+}
+
+# namespace ::mon
+proc buildTop {{W .mon}} {
+	variable var
+
+	destroy $W
+	catch {
+		image delete [namespace current]::wf
+	}
+	if {$W eq "."} {
+		set W ""
+	} else {
+		destroy $W
+		toplevel $W
+	}
+	buildImages
+	set var(top) $W
+	wm title $W $var(title)
+	wm geometry $W $var(win,W)x$var(win,H)
+	wm protocol $W WM_DELETE_WINDOW [namespace current]::quit
+	wm resizable $W 0 1
+	::ttk::style theme use clam
+	::ttk::style configure bold.TButton -font {TkDefaultFont -14 bold} -foreground #444 -bordercolor #888
+	::ttk::style map bold.TButton -foreground {active #f22}
+	::ttk::style configure active.bold.TButton -foreground #f22
+	::ttk::style map active.bold.TButton -foreground {active #444}
+	::ttk::style configure norm.TButton -foreground #444 -bordercolor #888 -font {TkDefaultFont -11}
+	::ttk::style map norm.TButton -foreground {active #088}
+	::ttk::style configure active.norm.TButton -foreground #088 -font {TkDefaultFont -11}
+	::ttk::style map active.norm.TButton -foreground {active #444}
+	::ttk::style configure TCombobox -foreground #00f
+	::ttk::style configure TEntry -foreground #00f
+	::ttk::style config TSpinbox -padding {4 0 4 0} -arrowsize 8 -foreground #00f
+	::ttk::style config TCheckbutton -padding 0
+	::ttk::style config smallBold.TLabel -font {TkDefaultFont -10 bold}
+	::ttk::style config bold.TLabel -font {TkDefaultFont -11 bold}
+	::ttk::style config light.TFrame -background #eee
+	::ttk::style config    red.TCombobox -fieldbackground #f88
+	::ttk::style config  green.TCombobox -fieldbackground #8f8
+	::ttk::style config   cyan.TCombobox -fieldbackground #8ff	
+	::ttk::style config orange.TCombobox -fieldbackground #fc8	
+	::ttk::style configure nobd.TButton -relief flat -padding 0 -border 0
+	
+	font configure TkDefaultFont -size -11
+	font configure TkTextFont -size -11
+
+	# main sections of top window
+	# left section
+	pack [::ttk::frame $W.lf] -side left -expand 1 -fill both -anchor nw
+	# top left section, the screen canvas
+	set var(scr) $W.lf.c
+	buildScreen $var(scr)
+
+	# bottom top section, the settings
+	pack [set var(setnb) [::ttk::notebook $W.lf.setnb]] -fill both -expand 1
+	# general tools and parameters
+	buildSettings $var(setnb)
+	# right section
+	pack [::ttk::frame $W.rf -relief ridge -borderwidth 1 -padding 3] -side top -expand 1 -fill both
+	# screen controls and command/log window
+	buildControls $W.rf
+	update
+
+	# other necessities
+	buildPopup
+	buildBinds
+	catch {
+		wm geometry $W  $var(geometry)
+	}
+}
+
+# namespace ::mon
+proc buildXcvrSettings W {
+	variable var
+
+	set w [::ttk::frame $W.xcvrsetf]
+	$W add $w -text "Transceiver settings"
 
 	pack [::ttk::scrollbar $w.vsb -orient vertical -command [list $w.xcvrf yview]] -side right -fill y
 	pack [set c [canvas $w.xcvrf -background #eceae5 -yscrollcommand [list $w.vsb set] -xscrollincrement 1 -yscrollincrement 1]] -fill both -expand 1
@@ -600,89 +724,6 @@ proc buildSettings W {
 	lassign [$w.xcvrf bbox all] x y e s
 	$w.xcvrf configure -scrollregion [list -3 -5 $e $s]
 	$w.xcvrf yview moveto 0.0
-
-	buildQuickSettings $W
-	buildRfMonSettings $W
-	# select the 'quick settings' panel
-	$W select 1
-}
-
-# namespace ::mon
-proc buildTop {{W .mon}} {
-	variable var
-
-	destroy $W
-	catch {
-		image delete [namespace current]::wf
-	}
-	if {$W eq "."} {
-		set W ""
-	} else {
-		destroy $W
-		toplevel $W
-	}
-	buildImages
-	initColors
-	set var(top) $W
-	wm title $W $var(title)
-	wm geometry $W $var(win,W)x$var(win,H)
-	wm protocol $W WM_DELETE_WINDOW [namespace current]::quit
-	wm resizable $W 0 1
-	::ttk::style theme use clam
-	::ttk::style configure bold.TButton -font {TkDefaultFont -14 bold} -foreground #222
-	::ttk::style configure boldRed.TButton -font {TkDefaultFont -14 bold} -foreground #800
-	::ttk::style configure TCombobox -foreground #00f
-	::ttk::style configure TEntry -foreground #00f
-	::ttk::style config TSpinbox -padding {4 0 4 0} -arrowsize 8 -foreground #00f
-	::ttk::style config TCheckbutton -padding 0
-	::ttk::style config smallBold.TLabel -font {TkDefaultFont -10 bold}
-	::ttk::style config bold.TLabel -font {TkDefaultFont -11 bold}
-	::ttk::style config light.TFrame -background #eee
-	::ttk::style config    red.TCombobox -fieldbackground #f88
-	::ttk::style config  green.TCombobox -fieldbackground #8f8
-	::ttk::style config   cyan.TCombobox -fieldbackground #8ff	
-	::ttk::style config orange.TCombobox -fieldbackground #fc8	
-	::ttk::style configure nobd.TButton -relief flat -padding 0 -border 0
-	
-	font configure TkDefaultFont -size -11
-	font configure TkTextFont -size -11
-
-	# main sections of top window
-	# left section
-	pack [::ttk::frame $W.lf] -side left -expand 1 -fill both -anchor nw
-	# top left section, the screen canvas
-	set var(scr) $W.lf.c
-	buildScreen $var(scr)
-
-	# bottom top section, the settings
-	pack [set var(setnb) [::ttk::notebook $W.lf.setnb]] -fill both -expand 1
-	# general tools and parameters
-	buildSettings $var(setnb)
-	# right section
-	pack [::ttk::frame $W.rf -relief ridge -borderwidth 1 -padding 3] -side top -expand 1 -fill both
-	# screen controls and command/log window
-	buildControls $W.rf
-	update
-
-	# other necessities
-	buildPopup
-	bildBinds
-	catch {
-		wm geometry $W  $var(geometry)
-	}
-}
-
-# namespace ::mon
-proc buildXmit W {
-	variable var
-	pack [set w [::ttk::labelframe $W.xmitf -text "Transmission:" -padding {5 2} -labelanchor nw]] -anchor nw -pady 2 -fill x -side top
-	pack [::ttk::frame $w.f1 -padding {0 1}] -anchor w -fill x
-	pack [::ttk::label $w.f1.xmodl -text "Mode:" -width 5 -anchor w] -side left -anchor w
-	pack [::ttk::combobox $w.f1.xmodcb -textvariable [namespace current]::var(txmode) -values {FSK CW} -width 4 -justify right] -anchor w -side left
-	pack [::ttk::label $w.f1.durl -text " Dur:" -width 4 -anchor w] -side left -anchor w
-	pack [::ttk::combobox $w.f1.durcb -textvariable [namespace current]::var(txdur) -values {On 1 5 10 30 60 90 120} -width 3 -justify right] -anchor w -side left
-
-	pack [::ttk::button $w.xmitb -style boldRed.TButton -text "Transmit" -command [namespace current]::xmit -textvariable [namespace current]::var(xmitting) -width 16 -padding {0 3}] -anchor center -pady 3 -side top
 }
 
 # namespace ::mon
@@ -855,6 +896,27 @@ proc drawAxis {W args} {
 }
 
 # namespace ::mon
+proc drawBER {W {minxsep 25}} {
+	variable var
+
+	$W delete gber
+	# y axis dB
+	set dp $var(sa,base)
+	for {set ber 0} {$ber <= 100} {incr ber 20} {
+		set d [expr {$var(sa,base) - $var(ber,scale) / 100.0 * $ber}]
+		if {$d <= ($dp - $minxsep)} {
+			$W create line 0 $d $var(wf,W) $d -fill $var(color,fill,gl) -tags [list g ber gberl g$d fx] -dash {2 2}
+			$W create text -5 $d -anchor e -text [expr {$ber/100.0}] -tags [list g gt ber gbert fx] -fill $var(color,fill,gt) -font {TkDefaultFont -10}
+			set dp $d
+		}
+		$W create line 0 $d -5 $d -fill $var(color,fill,gl) -tags [list g gl ber gberl gbertc g$d fx]
+	}
+	# PER line
+	$W create line 0 0 0 0 -fill $var(color,fill,PER) -tags [list ber PER]
+	$W itemconfig ber -state hidden
+}
+
+# namespace ::mon
 proc drawEvent args {
 	variable var
 	# args are x, y, mark
@@ -872,34 +934,41 @@ proc drawEvent args {
 }
 
 # namespace ::mon
-proc drawGrid W {
+proc drawFreqGrid {W y {minxsep 25}} {
 	variable var
 
-	# minimum separation of grid lines to be redable
-	set minxsep 25
-	set fs 1 ; # frequency step
-	# hide items that may interfere with grid
-	$W itemconfig BW -state hidden
-	$W delete g
 	set lf [expr {int(ceil([chan2freq [dict get $var(rf12b) lch]]))}]
 	set uf [expr {int(floor([chan2freq [dict get $var(rf12b) uch]]))}]
-
+	set fs 1 ; # frequency step
+	$W delete {gxl || gxt}
 	set dp 0
 	for {set f $lf} {$f <= $uf} {incr f $fs} {
 		set d [freq2scr $f]
 		# don't draw grid outside of waterfall
 		if {$d > $var(wf,W)} break
 		if {$d >= ($dp + $minxsep)} {
-			$W create line $d 0 $d $var(sa,base) -fill $var(color,fill,gl) -tags [list g gl gxl g$d fx] -dash {2 2}
-			set ti [$W create text $d [expr {$var(sa,base) + 7}] -anchor n -text $f -tags [list g gt gxt g$d fx] -fill $var(color,fill,gt) -font {TkDefaultFont -10}]
+			$W create line $d 0 $d $y -fill $var(color,fill,gl) -tags [list g gl gxl g$d fx] -dash {2 2}
+			set ti [$W create text $d [expr {$y + 7}] -anchor n -text $f -tags [list g gt gxt g$d fx] -fill $var(color,fill,gt) -font {TkDefaultFont -10}]
 			# if despite our efforts our new grid text overlaps with something, then delete it
 			if {[$W find overlapping {*}[$W bbox $ti]] ne $ti} {
 				$W delete $ti
 			}
 			set dp $d
 		}
-		$W create line $d $var(sa,base) $d [expr {$var(sa,base) + 5}] -fill $var(color,fill,gl) -tags [list g gl gxl gxtc g$d fx]
+		$W create line $d $y $d [expr {$y + 5}] -fill $var(color,fill,gl) -tags [list g gl gxl gxtc g$d fx]
 	}
+}
+
+# namespace ::mon
+proc drawGrid W {
+	variable var
+
+	# minimum separation of grid lines to be readable
+	set minxsep 25
+	# hide items that may interfere with grid
+	$W itemconfig BW -state hidden
+	$W delete {g && !ber}
+	drawFreqGrid $W $var(sa,base) $minxsep
 	# y axis dB
 	set dp $var(sa,base)
 	for {set dBm  $var(RSstep)} {$dBm < $var(RSr)} {incr dBm $var(RSstep)} {
@@ -956,11 +1025,11 @@ proc drawMark {txt args} {
 # namespace ::mon
 proc drawRxBW {W args} {
 	variable var
-	
+
 	set x [freq2scr $var(xcvr,FSC,Freq)]
 	set var(lbw) [freq2scr [expr {$var(xcvr,FSC,Freq) - $var(xcvr,RCC,BW)/2000.0}]]
 	set var(ubw) [freq2scr [expr {$var(xcvr,FSC,Freq) + $var(xcvr,RCC,BW)/2000.0}]]
-	if {!$var(bw,on) || 0 > $var(ubw) || $var(lbw) > $var(wf,W)} {
+	if {!$var(bw,on) || (0 > $var(ubw) || $var(lbw) > $var(wf,W)) || $var(state) == 3} {
 		$W itemconfig BWr -state hidden
 	} elseif {$var(bw,on)} {
 		$W itemconfig BWr -state normal
@@ -977,8 +1046,15 @@ proc drawRxBW {W args} {
 proc drawScanline {} {
 	variable var
 
-	if {$var(state) != 2} return
-	set r $var(r)
+	if {$var(r) < $var(wf,H)} {
+		incr var(r)
+	} else {
+		set var(r) 0
+	}
+	set var(clock,$var(r)) [clock milli]
+	# map escaped chars back to original chars
+	set var(scandata) [string map {ÿÿ ÿ ÿ \n} $var(scandata)]
+ 	binary scan $var(scandata) c* var(scandata)
 	# delete events from previous scans on this row
 	editMark delete $var(r)
 	$var(wfi) put #000 -to 0 $var(r) $var(wf,W) [expr {$var(r) + 1}]
@@ -1010,7 +1086,7 @@ proc drawScanline {} {
 	lassign {} scanline maxs sig
 	set len [llength $var(scandata)] ; set len [expr {$var(scan,start) + $len < $var(wf,W) ? $len : $var(wf,W) - $var(scan,start)}]
 	# move current scan line
-	$var(scr) coords cscl $var(scan,start) [expr {$r + 2}] [expr {$var(scan,start) + $len}] [expr {$r + 2}]
+	$var(scr) coords cscl $var(scan,start) [expr {$var(r) + 2}] [expr {$var(scan,start) + $len}] [expr {$var(r) + 2}]
 
 	set coords [list $var(scan,start) $var(sa,base)]
 	for {set i 0} {$i < $len} {incr i} {
@@ -1106,8 +1182,8 @@ proc drawScreen W {
 
 	$W del [list ! NO]
 	# section borders
-	$W create line 0 -$var(top,margin) 0 $var(c,H) -tags [list fl flv fx] -fill $var(color,fill,fl)
-	$W create line -500 0 $var(c,W) 0 -tags [list fl flh fx] -fill $var(color,fill,fl)
+	$W create line -1 -$var(top,margin) -1 $var(c,H) -tags [list fl flv fx] -fill $var(color,fill,fl)
+	$W create line -500 -1 $var(c,W) -1 -tags [list fl flh fx] -fill $var(color,fill,fl)
 	$W create line $var(wf,W) -$var(top,margin) $var(wf,W) $var(c,H) -tags [list fl flv fx] -fill $var(color,fill,fl)
 	$W create line -500 $var(wf,H) $var(c,W) $var(wf,H) -tags [list fl flh fx] -fill $var(color,fill,fl)
 	$W create line [expr {$var(sl,start) + $var(sa,H)}] -$var(top,margin) [expr {$var(sl,start) + $var(sa,H)}] $var(c,H) -tags [list fl flv fx] -fill $var(color,fill,fl)
@@ -1115,7 +1191,7 @@ proc drawScreen W {
 
 	$W create text -50 -10 -text "Time" -anchor sw -font {TkDefaultFont -10 bold} -fill $ttcolor -tags {tmt fx tt}
 	$W create text -58 -5 -text "" -anchor w -font {TkDefaultFont -9} -fill #666 -tags {clock fx}
-	$W create text [expr {$var(wf,W) + 5}] -10 -text "dBm" -anchor sw -fill #444 -tags {hzt fx} -font {TkDefaultFont -12 bold}
+	$W create text [expr {$var(wf,W) + 5}] -10 -text "dBm" -anchor sw -fill #444 -tags {hdB fx} -font {TkDefaultFont -12 bold}
 
 	$W create text -50 [expr {$var(wf,H) + 0 + 5}] -text "dBm" -anchor nw -font {TkDefaultFont -10 bold} -fill $ttcolor -tags {gat fx tt}
 	$W create text 5 -10 -text "MHz" -anchor sw -fill #444 -tags {hzt fx} -font {TkDefaultFont -12 bold}
@@ -1123,28 +1199,28 @@ proc drawScreen W {
 	$W create text [expr {$var(c,W) - $var(left,margin) - 81}] -3 -anchor se -text "nRf" -fill #88f -tags {RFmon Rf fx NO} -font {TkDefaultFont -14 bold}
 	$W create text [expr {$var(c,W) - $var(left,margin) - 45}] -3 -anchor se -text "mon" -fill #f80 -tags {RFmon mon fx NO} -font {TkDefaultFont -14 bold}
 	$W create text [expr {$var(c,W) - $var(left,margin) - 5}] -3 -anchor se -text $var(version) -fill #666 -tags {RFmon ver fx NO} -font {TkDefaultFont -10 bold}
-	$W create text [expr {$var(c,W) - $var(left,margin) - 10}] [expr {$var(wf,H) + 0 + 5}] -text "Spectrum" -anchor ne -fill $ttcolor -tags {sat fx tt} -font {TkDefaultFont -11 bold}
+	$W create text [expr {$var(c,W) - $var(left,margin) - 10}] [expr {$var(wf,H) + 0 + 5}] -text "Data" -anchor ne -fill $ttcolor -tags {sat fx tt} -font {TkDefaultFont -11 bold}
 	drawGrid $W
 	# vertical x cursor
 	set ty [expr {-11 - 9 * ($var(markcnt) %2)}]
 	set x 0
 	set tx [expr {$x + 6}]
-	$W create line $tx $ty $x $ty $x 0 -arrow last -arrowshape {6 7 3} -fill #ffffff -tags [list xc xca fx c]
-	$W create text $tx $ty -text [format " %0.2f GHz" [expr {($var(lch) + $x * $var(scale))/1000.0}]] -fill #fff -font {TkDefaultFont -9} -anchor w -tags [list xc xct fx c]
-	$W create line $x 0 $x $var(c,H) -fill $var(color,fill,curs) -tags [list curs xc xcl fx c]
+	$W create line $tx $ty $x $ty $x 0 -arrow last -arrowshape {6 7 3} -fill #ffffff -tags [list xc xca fx curs]
+	$W create text $tx $ty -text [format " %0.2f GHz" [expr {($var(lch) + $x * $var(scale))/1000.0}]] -fill #fff -font {TkDefaultFont -9} -anchor w -tags [list xc xct fx curs]
+	$W create line $x 0 $x $var(c,H) -fill $var(color,fill,curs) -tags [list curs xc xcl fx curs]
 	# horizontal RSth threshold cursor 
 	$W create line 0 0 0 0 -fill $var(color,fill,curs) -dash {2 2} -tags [list RSth RSthl fx curs] 
-	$W create text -5  $var(c,H) -text "" -fill #fff -font {TkDefaultFont -9} -anchor e -tags [list RSth RStht fx]
+	$W create text -5  $var(c,H) -text "" -fill #fff -font {TkDefaultFont -9} -anchor e -tags [list RSth RStht fx curs]
 	# horizontal avg cursor 
 	$W create line 0 0 0 0 -fill $var(color,fill,curs) -dash {2 2} -tags [list yc ycl ycal fx curs]
-	$W create text -5  $var(c,H) -text "" -fill #fff -font {TkDefaultFont -9} -anchor e -tags [list yc yct ycat fx c]
+	$W create text -5  $var(c,H) -text "" -fill #fff -font {TkDefaultFont -9} -anchor e -tags [list yc yct ycat fx curs]
 	# maxrssi line
 	$W create line 0 0 0 0 -fill $var(color,fill,curs) -dash {2 2} -tags [list maxrssi maxrssil fx curs] 
-	$W create text [expr {$var(wf,W) + 5}] $var(sa,base) -anchor w -fill #fff -font {TkDefaultFont -10} -text "$var(Pmin) dBm" -tags {maxrssi maxrssit fx c}
+	$W create text [expr {$var(wf,W) + 5}] $var(sa,base) -anchor w -fill #fff -font {TkDefaultFont -10} -text "$var(Pmin) dBm" -tags {maxrssi maxrssit fx curs}
 	# time cursor
-	$W create line 0 0 0 0 -fill #fff -tags [list tc tca fx c] -arrow last -arrowshape {6 7 3}
-	$W create line 0 0 0 0 -tags {tc tcl fx c curs} -dash {2 2} -fill $var(color,fill,curs)
-	$W create text -5  0 -text "" -fill #fff -font {TkDefaultFont -9} -anchor e -tags [list tc tct fx c]
+	$W create line 0 0 0 0 -fill #fff -tags [list tc tca fx curs] -arrow last -arrowshape {6 7 3}
+	$W create line 0 0 0 0 -tags {tc tcl fx curs} -dash {2 2} -fill $var(color,fill,curs)
+	$W create text -5  0 -text "" -fill #fff -font {TkDefaultFont -9} -anchor e -tags [list tc tct fx curs]
 	$W itemconfig [list xcl || ycl] -dash {2 2}
 	# hold max line
 	$W create line 0 0 0 0 -fill $var(color,fill,SPM) -tags {sa SPM NO}
@@ -1153,7 +1229,7 @@ proc drawScreen W {
 	# spectrum x axis
 	$W create line 0 $var(sa,base) $var(wf,W) $var(sa,base) -tags [list sax fx] -fill #222
 	# milliseconds per line
-	$W  create text [expr {$var(c,W) - $var(left,margin) - 10}] [expr {$satop + 20}] -text "$var(mspl) ms" -tags {mspl fx} -anchor e -font {TkFixedFont -10} -fill #666
+	$W  create text [expr {$var(sl,start) + $var(sa,H) + 15}] [expr {$satop + 20}] -tags {mspl fx} -anchor nw -font {TkFixedFont -10} -fill $var(color,fill,mspl)
 	# scan zone width indicator
 	$W create line 0 0 0 0 -fill #0af -tags {SZ SZ1 fx NO} -width 1
 	# bandwidth rect
@@ -1163,9 +1239,10 @@ proc drawScreen W {
 	$W create line 0 0 0 0 -fill $var(color,fill,BWa) -tags {BW BWa BWa3 fx NO} -width 1
 	$W create rect 0 0 0 0 -tags {maxrssi maxrssir fx c} -outline #8f4
 	# create current scan line
-	$W create line 0 0 $var(wf,W) 0 -tags {cscl NO} -fill $var(color,fill,cscl) -width 2
+	$W create line 0 0 $var(wf,W) 0 -tags {cscl NO} -fill $var(color,fill,cscl) -width 1
 	$W raise cross
 	$W raise maxrssi
+	$W raise fl
 }
 
 # namespace ::mon
@@ -1203,8 +1280,8 @@ proc drawXmit {{delay 0}} {
 		set var(simlx) [expr {int($x - $var(simlx))}]
 	}
 	if {$delay > 0} {
-		set var(sim,delay) [expr {$delay * 1000.0 - 100}]
-		set var(sim,timer) [after 100 [namespace current]::drawXmit [expr {$var(sim,delay) / 1000.0}]]
+		set var(sim,delay) [expr {$delay - 100}]
+		set var(sim,timer) [after 100 [namespace current]::drawXmit $var(sim,delay)]
 		$var(scr) coords SP 0 $var(sa,base) $var(wf,W) $var(sa,base)
 	} else {
 		# draw the xmit pixels
@@ -1409,7 +1486,7 @@ proc init {{scanwidth 423}} {
 	}
 	array set var {
 		title "nRfMon"
-		version v0.6a
+		version v0.7a
 
 		state 0
 		state0 0
@@ -1426,8 +1503,6 @@ proc init {{scanwidth 423}} {
 		mark,margin 160
 		sl,left 0
 		
-		scanning "Scan"
-		xmitting "Transmit"
 		txmode FSK
 		txpower 0
 		txdur On
@@ -1474,6 +1549,9 @@ proc init {{scanwidth 423}} {
 		sl,on 2
 		bw,on 0
 		sendi,on 1
+		quiet,on 0
+		pause,on 0
+		
 		after,sendi {}
 		
 		lch 96
@@ -1503,9 +1581,34 @@ proc init {{scanwidth 423}} {
 			256000
 		}
 		portspeed 57600
+		
+		ber,plen 52
+		ber,on 1
+		ber,after {}
+		ber,pcnt 128
+		ber,bcnt 0
+		ber,berr 0
+		ber,pnr 0
+		ber,bgood 0
+		ber,pgood 0
+		ber,bers {423 423}
+		ber,watchdog {}
+		ber,scale 128
+		ber,noise 1
+		
+		data,frag 0
+		data,data {}
+		data,start 0
+		data,len 0
+	}
+	array set var {
+		SLIP_END \uC0
+		SLIP_ESC \uDB
+		SLIP_ESC_END \uDC
+		SLIP_ESC_ESC \uDD
 	}
 	# set default values
-	set var(xcvr,data) {b 2 l 96 u 3903 z 9 c 1600 p 0 hw {} xcvr {} z0 9 dfsk 15}
+	set var(xcvr,data) {b 2 l 96 u 3903 z 9 c 1600 p 0 hw {} xcvr {} z0 9 dfsk 15 s {l 96 u 3903 z 9} offdur 100 pcnt 128}
 	set var(scan,W) $scanwidth
 	array set var [createDimensions $var(scan,W)]
 	# calculate dBs per pixel
@@ -1514,10 +1617,11 @@ proc init {{scanwidth 423}} {
 	getXcvrData
 	set var(ports) [enumerate Ports]
 	set var(gui) 1
+	initColors
+	loadPrefs
 	## turn off register update until application initializes
 	set tmp $var(sendi,on)
 	set var(sendi,on) 0
-	loadPrefs
 	buildTop
 	createExpColors
 	set var(sendi,on) $tmp
@@ -1543,6 +1647,23 @@ proc initColors {} {
 		color,fill,BWa #0f0
 		color,outline,maxrssir #8f4
 		color,fill,gt #666
+		color,fill,mspl #ccc
+		
+		color,outline,xmit #f80
+		color,fill,xmit #f22
+		color,fill,PER #8f0
+		
+		color,fill,ber000 #224
+		color,fill,ber001 #88f
+		
+		color,fill,ber010 #470
+		color,fill,ber011	#8c4
+		
+		color,fill,ber100	#720
+		color,fill,ber101	#f40
+		
+		color,fill,ber110 #444
+		color,fill,ber111 #ccc
 	}
 }
 
@@ -1569,6 +1690,7 @@ proc initFreqArray {} {
 		set var(sig,$i) 0
 		set var(maxrssi,$i) $var(RSlev)
 	}
+	set var(clock) [clock milli]
 }
 
 # namespace ::mon
@@ -1592,7 +1714,7 @@ proc inside? {cx cy} {
 }
 
 # namespace ::mon
-proc loadPrefs {{fn nRfMon.conf}} {
+proc loadPrefs {{fn nrfmon.conf}} {
 	variable var
 	set fn [file join [pwd] $fn]
 	if {[file exists $fn]} {
@@ -1671,6 +1793,7 @@ proc mark {e args} {
 proc monSync {{data {}}} {
 	## syncronize local xcvr data with remote
 	variable var
+
 	set var(xcvr,data) [dict merge $var(xcvr,data) $data]
 	set var(xcvr,band) [dict get $var(xcvr,data) b]
 	# set tranceiver parameters for current band
@@ -1680,7 +1803,9 @@ proc monSync {{data {}}} {
 	set var(hw) [dict get $var(xcvr,data) hw]
 	wm title $var(top) "$var(title) - [dict get $var(xcvr,data) xcvr] $var(hw)"
 	$var(scr) delete M
-	drawGrid $var(scr)
+	if {$var(state) == 2} {
+		drawGrid $var(scr)
+	}
 }
 
 # namespace ::mon
@@ -1688,7 +1813,7 @@ proc moveCursors {W x y} {
 	variable var
 
 	# when to hide vertical cursor
-	if {0 > $x || $x > $var(sl,end)} {
+	if {$var(state) == 3 || 0 > $x || $x > $var(sl,end)} {
 		# cursor outside the frequency band
 		$W itemconfig cross -state hidden
 		$W configure -cursor {}
@@ -1702,7 +1827,7 @@ proc moveCursors {W x y} {
 		set cc 1
 	}
 	# when to hide horizontal cursor
-	if {0 > $y || $y > $var(sa,base)} {
+	if {$var(state) != 2 || 0 > $y || $y > $var(sa,base)} {
 		# hide time cursor
 		$W itemconfig tc -state hidden
 		$W itemconfig cross -state hidden
@@ -1798,6 +1923,11 @@ proc onConKey {key s} {
 				prompt
 			}
 		}
+		"Home" {
+			$var(con) see $var(con,inputLine).2
+			$var(con) mark set insert $var(con,inputLine).2
+			return -code break
+		}
 	}
 }
 
@@ -1864,19 +1994,23 @@ proc onEvent {e args} {
 }
 
 # namespace ::mon
-proc onMonEntry {W key} {
+proc onMonEntry {W color} {
 	variable var
 
-	if {$key eq "Return" || $key eq "KP_Enter"} {
-		# extract the item name from the array variable
-		set avar [$W cget -textvariable]
-		regexp -- {\(([^\)]*)\)} $avar _ item
-		catch {
-			lassign [split $item ,] f f t
-			# set the color option of the tag extracted from the item name
-			$var(scr) itemconfig $t -$f [set $avar]
-		}
+	set avar [$W cget -textvariable]
+	regexp -- {([^\()]*)\(([^\)]*)\)} $avar _ vp tmpi
+	set item [join [lrange [split $tmpi ,] 1 end] ,]
+	if {![regexp -- {(#[0-9A-Fa-f]{3}$)|(#[0-9A-Fa-f]{6}$)} $color]} {
+		return 1
 	}
+	# valid entry
+	set var($item) $color
+	catch {
+		lassign [split $item ,] f f t
+		# set the color option of the tag extracted from the item name
+		$var(scr) itemconfig $t -$f $color
+	}
+	return 1
 }
 
 # namespace ::mon
@@ -1922,7 +2056,6 @@ proc onStateChange args {
 	switch -- $var(state0) {
 		4 {
 			if {$var(state) != 4} {	
-				set var(xmitting) "Transmit"
 				after cancel $var(sim,timer)
 				# change back spectrum fill color
 				$var(scr) itemconfig SP -fill $var(color,fill,SP)
@@ -1934,10 +2067,7 @@ proc onStateChange args {
 			if {[llength $var(statemsg)]} {
 				con $var(statemsg)
 			}
-#			if {$var(state0)}	{
-				con ". Disconnected"
-#			}
-			set var(scanning) "Scan"
+			con ". Disconnected"
 			$var(port,wg) configure -style {}
 		}
 		1 {
@@ -1958,27 +2088,23 @@ proc onStateChange args {
 			if {[llength $var(statemsg)]} {
 				con $var(statemsg)
 			} elseif {$var(state) == 2} {
-				con  ". Scan mode"
+				con  ". Scanning"
 			} else {
-				con  ". Receive mode"
+				con  ". Listening"
 			}
-			if {$var(state) == 2} {
-				set var(scanning) "Stop"
-				$var(port,wg) configure -style cyan.TCombobox
-			} else {
-				set var(scanning) "Scan"
-				$var(port,wg) configure -style green.TCombobox
+			if {$var(state) == 2} { # scan
+				showScan
+			} else { # listen
+				showListen
 			}
 		}
 		4 {
 			if {[llength $var(statemsg)]} {
 				con $var(statemsg)
 			} elseif {$var(state0) != 4} {
-				con  ". Transmit mode"
+				con  ". Transmiting"
 			}
-			set var(xmitting) "Transmitting"
-			$var(port,wg) configure -style orange.TCombobox
-			$var(scr) itemconfig SP -fill #f22
+			showXmit
 		}
 		default {
 			tk_messageBox -message "Unknown state" -detail "State transition $var(state0)-$var(state)
@@ -2089,9 +2215,147 @@ proc opts2dict {W tag} {
 
 # namespace ::mon
 proc parseConCmd line {
-	if {[llength $line]} {
-		send $line
+	if {![llength $line]} return
+
+	if {[string range $line 0 1] eq "t "} {
+		## quick send text command 't <text>' will be sent as '<len>t0xFF<txt>, no space after 't' but a magic byte 0xFF
+		## To avoid misinterpretation of incoming data as text, the BERT cycle should be less than 255 packets long
+		set txt "ÿ[string range $line 2 end]"
+		set len [string length $txt]
+		set line ${len}t$txt
 	}
+	send $line
+}
+
+# namespace ::mon
+proc parseData {} {
+	variable var
+
+	# catch empty packets or packets with empty fields in the header
+	if {![binary scan [string range $var(data,data) end-1 end] H4 crc] ||
+		![binary scan [string range $var(data,data) 0 2] H2H2H2 grp id plen] ||
+		![info exists grp] || ![info exists id] || ![info exists plen] ||
+		($plen eq "00" && $crc eq "0000")
+	} {
+		advanceLine
+		return		
+	}
+	set crcb [expr {bool("0x$crc")}]
+	if {$var(ber,watchdog) eq ""} {
+		# duration of a BERT cycle * 1.5	
+		set var(ber,watchdog) [after [expr {int(1.0 / $var(xcvr,DRC,BR) * 8 * $var(ber,pcnt) * ($var(ber,plen) + 7 + 9)*1.5)}] [namespace current]::watchBER]
+	}
+	if {!$crcb && [string index $var(data,data) 3] eq "ÿ"} {
+		# possibly user typed data, print it to the console
+		set pnr $var(ber,pnr)
+		con "\u25BC g $grp id [scan $id %x]\n[string range $var(data,data) 4 end-2]"
+	} elseif {![binary scan [string index $var(data,data) 3] H2 pnr] || $pnr eq ""} {
+		advanceLine
+		return
+	}
+	if {! $crcb} {
+		# good packets
+		set var(ber,noise) 0
+		if {"0x$pnr" < "0x$var(ber,pnr)"} {
+			# just loopped to the start of the packet group
+			# packet counter has restarted, show ber values
+			# packets in error = total packets - good packets
+			set perr [expr {$var(ber,pcnt) - $var(ber,pgood)}]
+			if {$perr} {
+				set op "="
+				# Packet Error Rate, PER
+				set var(ber,per) [expr {double($perr)/$var(ber,pcnt)}]
+				# erroneous bits = total bits - good bits = total packets * 8 - good bits
+				# Bit Error Rate, BER
+				set var(ber,ber) [expr {double($var(ber,pcnt) * 8 * $var(ber,plen) - $var(ber,bgood))/($var(ber,pcnt) * 8 * $var(ber,plen))}]
+			} else {
+				# ber cannot be 0, we are just lucky not to see any till now
+				set op "<"
+				set var(ber,ber) [expr {0.5/($var(ber,pcnt) * 8 * $var(ber,plen))}]
+				set var(ber,per) [expr {0.5/($var(ber,pcnt) * 8)}]
+			}
+			# plot BER
+			plotBER "BER $op [format %0.2E $var(ber,ber)]\nPER $op [format %0.2E $var(ber,per)] ($perr/$var(ber,pcnt))"
+			# leave an empty line before drawing new packets
+			incr var(r)
+			lassign {0 0} var(ber,pgood) var(ber,bgood)
+		}
+		# increase good packets count
+		incr var(ber,pgood)
+		
+	} elseif {$var(ber,pnr) eq "7f"} {
+		# we've seen last packet of the cycle with count 0x7F (128d) so the next one is expected to be nr 0x00
+		# If it is not 0x00 then it has a bad CRC it is considered noise 
+ 		set var(ber,noise) 1
+	}
+	# make a bitstream copy of input data
+	binary scan $var(data,data) B* var(ber,bdata)
+	# make a bitstream copy of test pattern
+	binary scan [binary format H6 00012F][string index $var(data,data) 3][string repeat U 46][binary format H4 0000] B* btest
+	set len [string length $var(data,data)]
+	# advance enough lines to fit the length of the packet
+	set r1 [expr {$var(r) + 2 + int($len * 8.0/ $var(wf,W))}]
+	$var(scr) coords cscl 0 $r1 $var(wf,W) $r1
+	# blank the lines
+	$var(wfi) put #000 -to 0  $var(r) $var(wf,W) $r1
+	for {set bi 0; set x 0} {$bi < $len * 8} {incr bi; incr x} {
+		if {$x >= $var(wf,W)} {
+			# packet is longer than the waterfall width
+			set var(r) [expr {($var(r) + 1) % $var(wf,H)}]
+			# start indented, pkt header is not repeated
+			set x 24
+		}
+		# get a bit of data
+		set b [string index $var(ber,bdata) $bi]
+		set bt [string index $btest $bi]
+		set e [expr {$bt eq ""? 1 : $b ^ $bt}]
+		# cobine error conditions to give meaningful colors
+		set cc [expr {($e | $var(ber,noise)) & $crcb}][expr {(! $e | $var(ber,noise)) & $crcb}]$b
+		# accumulate good bits
+		if {! $var(ber,noise)} {
+			incr var(ber,bgood) [expr {! $e}]
+		}
+		# check each one of the 8 bits and draw a pixel depending on its value
+		$var(wfi) put -to $x $var(r) $var(color,fill,ber$cc)
+	}
+	advanceLine
+	if {!$crcb} {
+		set var(ber,pnr) $pnr
+	}
+}
+
+# namespace ::mon
+proc Pause W {
+	variable var
+	if {$var(pause,on)} {
+		after cancel $var(ber,watchdog)
+		set var(ber,watchdog) {}
+		$W config -style active.norm.TButton
+	} else {
+		$W config -style norm.TButton
+	}
+}
+
+# namespace ::mon
+proc plotBER {{txt {}}} {
+	variable var
+
+	after cancel $var(ber,watchdog)
+	set var(ber,watchdog) {}
+	lappend var(ber,pers) [expr {$var(sa,base) - 1 - $var(ber,scale) * ($var(ber,per)<0? 0 : $var(ber,per))}]
+	set len [expr {$var(wf,W) - 1}]
+	set var(ber,pers) [lrange $var(ber,pers) end-$len end]
+	set x 0
+	set pcoords {}
+	foreach y $var(ber,pers) {
+		lappend pcoords $x $y
+		incr x
+	}
+	if {[llength $pcoords] >= 4} {
+		$var(scr) coords PER $pcoords
+	}
+	$var(scr) itemconfig mspl -text "$txt\nQuiet = $var(quiet,on)"
+	set var(clock0) $var(clock)
 }
 
 # namespace ::mon
@@ -2124,7 +2388,7 @@ proc portSetup {{what {}}} {
 	catch {
 		close $var(port)
 	}
-	if {[string match "disc*" $var(portname)] || ![llength $var(portname)]} {
+	if {[string match "disc*" $what] || [string match "disc*" $var(portname)] || ![llength $var(portname)]} {
 		set var(portname) {}
 		con "\u03df Disconnect"
 		setState 0
@@ -2142,20 +2406,19 @@ proc portSetup {{what {}}} {
 		}
 	} err]} {
 		setState 0 $err
-		# skip toggleScan resume
 		return -level 2
 	}
-	# empty input buffer
-	chan config $var(port) -blocking 0 -buffering line -mode $var(portspeed),n,8,1
+	chan config $var(port) -blocking 0 -buffering line -mode $var(portspeed),n,8,1 -translation binary
 	# pretty nasty stuff to avoid blocking on open or write with Mac OS X
 	if {$::tcl_platform(os) eq "Darwin"} {
 		# prevent modem control from blocking serial ouput
 		exec stty clocal <@$var(port)
 		after 1000 ;# extra delay may avoid kernel panic due to FTDI driver bug
 	}
+	# empty input buffer
 	read $var(port)
 	chan event $var(port) read [list [namespace current]::receive $var(port)]
-	send "v9,1s"
+	send "vg9,0s"
 	set var(concnt) 4
 	set var(afteropen) [after $var(contimeout) [namespace current]::xcvrGetId]
 	con "\u03df Connect ($var(portname))"
@@ -2165,7 +2428,7 @@ proc portSetup {{what {}}} {
 # namespace ::mon
 proc print {} {
 	variable var
-	con "\nRegister configuration summary:\n----"
+	con "\nCurrent configuration summary:\n----"
 	dict for {C fields} [dict get $var(rf12b) cmds] {
 		if {![string match "\[A-Z]*" $C] || ![info exists var(xcvr,$C)]} continue
 		lappend out $var(xcvr,$C) [dict get $fields desc]
@@ -2173,7 +2436,6 @@ proc print {} {
 	foreach {C desc} [lsort -stride 2 -dict -index 1 $out] {
 		con $C\t$desc
 	}
-	con ""
 }
 
 # namespace ::mon
@@ -2200,19 +2462,48 @@ proc quit {} {
 proc receive port {
 	variable var
 
+	set var(clock) [clock milli]
 	if {[catch {
 		gets $port var(scandata)
 	} err]} {
 		setState 0 $err
 		return
 	}
-	if {![string length $var(scandata)]} return
-
-	if {[lindex $var(scandata) 0] eq "<"} {
-		con $var(scandata)
+	if {$var(pause,on) || ![string length $var(scandata)]} return
+	
+	if {$var(data,frag)} {
+		receiveFrag
+	} elseif {[string range $var(scandata) 0 1] eq "< "} {
+		# special case: command 'd' comes with possible binary data that may break tcl list manipulation commands
+		# so first make sure we extract incoming data properly
+		if {[regexp -- {([0-9]+)d} [string range $var(scandata) 2 end] _ var(data,len)]} {
+			set var(data,start) [string first "d \{" $var(scandata)]
+			incr var(data,start) 3
+			set var(data,data) [string range $var(scandata) $var(data,start) end]
+			# leave command and printable content
+			set var(scandata) [string range $var(scandata) 0 [incr var(data,start) -5]]
+			set var(data,frag) [string length $var(data,data)]
+			if {$var(data,len) < $var(data,frag)} {
+				# exclude the closing brace
+				set var(data,data) [string range $var(data,data) 0 end-2]
+				set var(data,frag) 0
+			} else {
+				set var(data,cmd) $var(scandata)
+				append var(data,data) \n
+				return
+			}
+		} else {
+			set var(data,data) {}
+			set var(scandata) [string range $var(scandata) 0 end-1]
+		}
+		if {[string length [string trim $var(scandata)]]} {
+			con $var(scandata)
+		}
 		# make sure we can assign incoming data to a dict
 		if {!([llength $var(scandata)] % 2)} {
 			set var(xcvr,data) [dict merge $var(xcvr,data) $var(scandata)]
+		} else {
+			return
 		}
 		set cmd [lindex $var(scandata) 1]
 		switch -glob -- $cmd {
@@ -2229,7 +2520,6 @@ proc receive port {
 			}
 			"*v" {
 				# firmware signatiure, always puts us in a known state, scanning
-				setState 3
 				after cancel $var(afteropen)
 				monSync
 				event generate $var(top) <<PortChanged>> -data conn
@@ -2239,14 +2529,10 @@ proc receive port {
 				setState $var(rxstate)
 			}
 			"*x" {
+				set var(ber,pcnt) [dict get $var(xcvr,data) pcnt]
 				setState 4
 				monSync
-				if {$var(state) == 4 && [dict exists $var(scandata) TXC]} {
-					# calculate tx bandwidth
-					set dfsk 0x[dict get $var(scandata) TXC]
-					dict set var(xcvr,data) dfsk [expr {15*((($dfsk & 0x00f0) >> 4) + 1)}]
-				}
-				drawXmit [lindex [dict get $var(xcvr,data) x] 1]
+				drawXmit [dict get $var(xcvr,data) offdur]
 			}
 			"0o" {
 				# this is the status word
@@ -2257,22 +2543,58 @@ proc receive port {
 				set var(offs) [lrange $var(offs) end-10 end]
 #				puts [decodeStatus $status]\tFoff\t$offset ;#[expr {round([avgList $var(offs)])}]
 			}
+			"*d" {
+				set var(xcvr,data) [dict merge {d {g 0 hdr 0 crc 1}} $var(xcvr,data)]
+				if {$var(state) == 3} {
+					parseData
+				}
+			}
+			"*t" {
+				# xcvr's responce to our command
+				set var(sent) {}
+				setState $var(rxstate)
+			}
+			"*q" {
+				$var(quietrb) config -style [expr {[dict get $var(xcvr,data) q]? "active.":""}]norm.TButton
+			}
 			default {
 				if {[llength $var(scandata)] > 2} {
 					monSync
-					return
 				}
 			}
 		}
-	} elseif {[string length $var(scandata)] > 0} {
-		if {$var(r) < $var(wf,H)} {
-			incr var(r)
-		} else {
-			set var(r) 0
-		}
-		set var(clock,$var(r)) [clock milli]
-		set var(scandata) [split $var(scandata) ""]
+	} elseif {$var(state) == 2} {
+		set var(scandata) [string range $var(scandata) 0 end-1]
 		drawScanline
+	}
+}
+
+# namespace ::mon
+proc receiveFrag {} {
+	variable var
+
+	# are we continuing a previously started data fragment ?
+	if {$var(data,frag)} {
+		# get the rest of the packet
+		set len [string length $var(scandata)]
+		append var(data,data) $var(scandata)
+		incr var(data,frag) $len
+		if {$var(data,len) < $var(data,frag)} {
+			set var(data,data) [string range $var(data,data) 0 end-2]
+			set var(data,frag) 0
+		} else {
+			# more data to come
+			return
+		}
+		# print the command stored earlier
+		if {[string length [string trim $var(data,cmd)]]} {
+			con $var(data,cmd)
+		}
+		# make sure we can assign incoming data to a dict
+		if {!([llength $var(data,cmd)] % 2)} {
+			set var(xcvr,data) [dict merge {d {g 0 hdr 0 crc 1}} $var(xcvr,data) $var(data,cmd)]
+		}
+		parseData
 	}
 }
 
@@ -2285,6 +2607,9 @@ proc resetMaxs {} {
 			set var(fp,max,$i) 0
 		}
 		$var(scr) coords SPM 0 0 0 0
+	}
+	if {$var(state) == 3} return 
+	if {$var(maxs,on)} {
 		$var(scr) itemconfig SPM -state normal
 	} else {
 		$var(scr) itemconfig SPM -state hidden
@@ -2303,12 +2628,12 @@ proc rgb {colors {r {0 0 255 255}} {g {0 0 255 255}} {b {0 0 255 255}}} {
 }
 
 # namespace ::mon
-proc savePrefs {{fn nRfMon.conf}} {
+proc savePrefs {{fn nrfmon.conf}} {
 	variable var
 	
 	set fd [open [file join [pwd] $fn] w+]
 	puts $fd "geometry [winfo geometry .mon]"
-	foreach n [array names var color,*] {
+	foreach n [lsort [array names var color,*]] {
 		puts $fd $n\t$var($n)
 	}
 	close $fd
@@ -2346,8 +2671,15 @@ proc send s {
 	variable var
 
 	try {
-		puts $var(port) $s
-		con "> $s"
+		puts -nonewline $var(port) $s
+		flush $var(port)
+		# store this command for verification of the reply
+		foreach {_ p _ _ v c} [regexp -all -inline -- {((([0-9]+),)*)([0-9]+)?([a-z])} $s] {
+			#lappend var(sent) [string map {, { }} $p]] $v $c
+			set var(sent) $v$c
+			# no command is allowed after command 't'
+			if {$c eq "t"} break
+		}
 		return 1
 	} on error err {
 		setState 0 "\u2588 Cannot transmit. Please choose a proper serial port."
@@ -2386,6 +2718,13 @@ proc setEventText args {
 }
 
 # namespace ::mon
+proc setQuiet W {
+	variable var
+
+	send "$var(quiet,on)q"
+}
+
+# namespace ::mon
 proc setState args {
 	variable var
 
@@ -2412,6 +2751,39 @@ proc showCross {W x {y {}}} {
 }
 
 # namespace ::mon
+proc showListen {} {
+	variable var
+
+	$var(port,wg) configure -style green.TCombobox
+	$var(lisnb) configure -style active.bold.TButton
+	$var(scanb) configure -style bold.TButton
+	$var(xmitb) configure -style bold.TButton
+	$var(scr) itemconfig {ber} -state normal
+	$var(scr) itemconfig {curs || gxt || gyl || gyt || SZ || BW || SP || SL || SPM} -state hidden
+	$var(scr) itemconfig gat -text "PER"
+	$var(scr) itemconfig hzt -text "Packet bitstream"
+}
+
+# namespace ::mon
+proc showScan {} {
+	variable var
+	clear all
+	$var(port,wg) configure -style cyan.TCombobox
+	$var(lisnb) configure -style bold.TButton
+	$var(scanb) configure -style active.bold.TButton
+	$var(xmitb) configure -style bold.TButton
+	$var(scr) coords SPM 0 0 0 0
+	$var(scr) itemconfig SP -fill $var(color,fill,SP)
+	$var(scr) itemconfig SP -outline $var(color,outline,SP)
+	$var(scr) itemconfig SPM -fill $var(color,fill,SPM)
+	$var(scr) itemconfig {ber} -state hidden
+	$var(scr) itemconfig {gyl || gyt || gxt || ycal || ycat || maxrssi || RSth || SP || SL} -state normal
+	$var(scr) itemconfig SPM -state [expr {$var(maxs,on)? "normal":"hidden"}]
+	$var(scr) itemconfig gat -text "dBm"
+	$var(scr) itemconfig hzt -text "MHz"
+}
+
+# namespace ::mon
 proc showXcursor {W x y} {
 	variable var
 
@@ -2435,6 +2807,20 @@ proc showXcursor {W x y} {
 		$W itemconfig [list xca || xct] -state hidden
 	}
 	$W itemconfig xcl -state normal
+}
+
+# namespace ::mon
+proc showXmit {} {
+	variable var
+
+	$var(lisnb) configure -style bold.TButton
+	$var(scanb) configure -style bold.TButton
+	$var(xmitb) configure -style active.bold.TButton
+	$var(port,wg) configure -style orange.TCombobox
+	$var(scr) itemconfig SP -state normal
+	$var(scr) itemconfig {PER} -state hidden
+	$var(scr) itemconfig SP -fill $var(color,fill,xmit)
+	$var(scr) itemconfig SP -outline $var(color,outline,xmit)
 }
 
 # namespace ::mon
@@ -2485,34 +2871,92 @@ proc simTxSpectrum {dx args} {
 }
 
 # namespace ::mon
-proc simTxTimer {{delay 0}} {
+proc slip_in s {
 	variable var
-	after cancel $var(sim,timer)
-	if {!$delay} {
-		drawXmit
-		set var(sim,timer) [after $var(mspl) [list [namespace current]::simTxTimer 0]]
-	} else {
-		set var(sim,timer) [after [expr {$delay * 1000}] [list [namespace current]::simTxTimer 0]]
+
+	lassign {} lastc out pkt
+	foreach c [split $s ""] {
+		switch -- [scan $c %c] {
+			219 { # SLIP_ESC
+				set lastc $c
+			}
+			192 { # SLIP_END
+				set lastc $c
+				# End marker found, we copy our input buffer to the uip_buf
+				# buffer and return the size of the packet we copied.
+				if {[string length $pkt]} {
+					lappend out $pkt
+					set pkt {}
+				}
+				continue
+			}
+			default {
+				if {$lastc eq $var(SLIP_ESC)} {
+					set lastc $c
+					# Previous read byte was an escape byte, so this byte will be
+					# interpreted differently from others.
+					switch -- [scan $c %c] {
+						220 { # SLIP_ESC_END
+							set c $var(SLIP_END)
+						}
+						221 { # SLIP_ESC_ESC
+							set c $var(SLIP_ESC)
+						}
+					}
+				} else {
+					set lastc $c
+				}
+				append pkt $c
+			}
+		}
 	}
+	return $out
 }
 
 # namespace ::mon
-proc toggleScan {} {
+proc slip_out {s {port {}}} {
+	## source http://arduino.cbwp.net/sketchbook/libraries/SerialIP/utility/slipdev.c
 	variable var
+	
+	append out $var(SLIP_END)
+	foreach c [split $s ""] {
+		switch -- [scan $c %c] {
+			192 { # SLIP_END
+				append out $var(SLIP_ESC)
+				append out $var(SLIP_ESC_END)
+			}
+			219 {# SLIP_ESC
+				append out $var(SLIP_ESC)
+				append out $var(SLIP_ESC_ESC)
+			}
+			default {
+				append out $c
+			}
+		}
+	}
+	append out $var(SLIP_END)
+}
+
+# namespace ::mon
+proc toggleCmdButton {} {
+	variable var
+
 	if {$var(state) < 2} {
 		con "\u2588 Not connected"
-		set var(scanning) "Scan"
 		return
 	}
-	# toggle state
-	if {$var(state) > 2} {
-		setState 2 "\u03df Scan"
-		send "1s"
-		$var(scanb) configure -text "Stop"
-	} else {
-		setState 3 "\u03df Stop scanning"
-		send "0s"
-		$var(scanb) configure -text "Scan"
+	switch -- $var(bstate) {
+		2 { # scan
+			setState 2 "\u03df Scan"
+			send "1s"
+		}
+		3 { # listen
+			setState 3 "\u03df Listening"
+			send "0s$var(xcvr,FSC,F)c"			
+		}
+		4 { # Xmit
+			xmit
+		}
 	}
 }
 
@@ -2521,7 +2965,7 @@ proc tuneHere s {
 	## tune on this point on screen
 	variable var
 	
-	if {$s < 0 || $var(wf,W) < $s} return
+	if {$var(state) == 3 || $s < 0 || $var(wf,W) < $s} return
 	# set new channel
 	set var(xcvr,FSC,F) [scr2chan $s]
 	# use current bandwidth value and calculate low and upper zone limits
@@ -2550,8 +2994,10 @@ proc tuneHere s {
 proc updateCursors {x y} {
 	variable var
 
-	$var(scr) itemconfig clock -text [clock format [expr {$var(clock,$var(r))/1000}] -format %H:%M:%S][string range [expr {fmod($var(clock,$var(r))/1000.0,1)}] 1 2]
-
+	if {[info exists var(clock,$var(r))]} {
+		$var(scr) itemconfig clock -text [clock format [expr {$var(clock,$var(r))/1000}] -format %H:%M:%S][string range [expr {fmod($var(clock,$var(r))/1000.0,1)}] 1 2]
+	}
+	
 	if {$var(sl,on) > 1} {
 		plotSignal [getSignalLine $x]
 	}
@@ -2585,6 +3031,21 @@ proc validateScalar s {
 }
 
 # namespace ::mon
+proc watchBER {} {
+	variable var
+	after cancel $var(ber,watchdog)
+	array set var {
+		ber,ber 0
+		ber,per 0
+		ber,watchdog {}
+		ber,pnr "7f"
+		ber,noise 1
+	}
+	set var(r) [expr {($var(r) + 1) % $var(wf,H)}]
+	plotBER "BER = no data\nPER = no data"
+}
+
+# namespace ::mon
 proc xcvrData {} {
 	# TODO better impleent the xcvr as an object 1600
 	variable var
@@ -2609,8 +3070,8 @@ proc xcvrData {} {
 				desc {1. Configuration Setting}
 				cmd 0x8000 
 				FB {desc {Freq. Band} lsb 4 type choice opts {915 3 868 2 433 1} units MHz def 868}
-				El {desc {TX register enable} type boolean lsb 7 def 0 units {}}
-				Ef {desc {RX FIFO enable} type boolean lsb 6 def 0 units {}}
+				El {desc {TX register enable} type boolean lsb 7 def 1 units {}}
+				Ef {desc {RX FIFO enable} type boolean lsb 6 def 1 units {}}
 				CLC {desc {Xtal load capac.} lsb 0 type choice opts {8.5 0 9 1 9.5 2 10 3 10.5 4 11 5 11.5 6 12 7 12.5 8 13.0 9 13.5 10 14 11 14.5 12 15 13 15.5 14 16 15} units {pF} def 12}
 			}
 			RCC {
@@ -2618,36 +3079,36 @@ proc xcvrData {} {
 				cmd 0x9000 
 				Pin16 {desc {Pin16} lsb 10 type choice opts {{Interrupt input} 0 {VDI output} 1} units {} def {VDI output}}
 				VDI {desc {VDI timing} lsb 8 type choice opts {Fast 0 Medium 1 Slow 2 {Always on} 3} units {} def Fast}
-				BW {desc {RX Bandwidth} lsb 5 type choice opts {400 1 340 2 270 3 200 4 134 5 67 6}	units kHz def 67 deps {}}
+				BW {desc {RX Bandwidth} lsb 5 type choice opts {400 1 340 2 270 3 200 4 134 5 67 6}	units kHz def 134 deps {}}
 				LNA {desc {LNA gain}	lsb 3 type choice opts {0 0 -6 1 -14 2 -20 3} units dB def 0}
 				RSSI {desc {RSSI threshold}	lsb 0 type choice opts {-61 7 -67 6 -73 5 -79 4 -85 3 -91 2 -97 1 -103 0} units dB def -103}
 			}
 			DRC {
 				desc {4. Data Rate}
 				cmd 0xC600 
-				R {desc {Rate setting (R)} lsb 0 type scalar from 0 to 127 incr 1 units {} def 35 format %0.0f width 4 deps {DRC,BR DRC,Cs}}
+				R {desc {Rate setting (R)} lsb 0 type scalar from 0 to 127 incr 1 units {} def 6 format %0.0f width 4 deps {DRC,BR DRC,Cs}}
 				Cs {desc "Prescaler \u00F78 (Cs)" lsb 7 type boolean opts {0 1} units {} def 0 }
-				BR {desc {Bit Rate (BR)} type entry from 0.337 to 344.827 incr 1.0 incr 0.5 units kbps def 9.5790 format %0.3f  deps {DRC,R DRC,Cs}}
+				BR {desc {Bit Rate (BR)} type entry from 0.337 to 344.827 incr 1.0 incr 0.5 units kbps def 49.261 format %0.3f  deps {DRC,R DRC,Cs}}
 				DBR {desc \u0394BR deps {} type function from 0.0 to 100.0 format %0.3f units kbps def 0 format %0.3f}
 			}
 			TXC {
 				desc {11. Transmitter Config.}
 				cmd 0x9800
 				Mp {desc {Freq. Shift} lsb 8 type choice opts {Positive 0 Negative 1} units {} def Positive }
-				M {desc {FSK shift} lsb 4 type choice opts {240	15 225	14 210	13 195	12 180	11 165	10 150	9 135	8 120	7 105	6 90	5 75	4 60	3 45	2 30	1 15	0 } units {kHz} def 15}
+				M {desc {FSK shift} lsb 4 type choice opts {240	15 225	14 210	13 195	12 180	11 165	10 150	9 135	8 120	7 105	6 90	5 75	4 60	3 45	2 30	1 15	0 } units {kHz} def 90}
 				Pwr {desc {Power output} lsb 0 type choice opts {0.0	0 -2.5	1 -5.0	2 -7.5	3 -10.0	4 -12.5	5 -15.0	6 -17.5	7} units {dB} def -17.5}
 			}
 			PMC {
 				desc {2. Power Management}
 				cmd 0x8200 
-				Er {desc {RX enable} lsb 7 type boolean units {} def 0 }
-				Ebb {desc {RX baseband} lsb 6 type boolean units {} def 0 }
+				Er {desc {RX enable} lsb 7 type boolean units {} def 1 }
+				Ebb {desc {RX baseband} lsb 6 type boolean units {} def 1 }
 				Et {desc {TX enable} lsb 5 type boolean units {} def 0 }
-				Es {desc {Synthesizer} lsb 4 type boolean units {} def 0 }
+				Es {desc {Synthesizer} lsb 4 type boolean units {} def 1 }
 				Ex {desc {Xtal oscillator} lsb 3 type boolean units {} def 1 }
-				Eb {desc {Low bat. detect.} lsb 2 type boolean units {} def 0 }
+				Eb {desc {Low bat. detect.} lsb 2 type boolean units {} def 1 }
 				Ew {desc {Wake-up timer} lsb 1 type boolean units {} def 0 }
-				Dc {desc {Disable clock output} lsb 0 type boolean units {} def 0 }
+				Dc {desc {Disable clock output} lsb 0 type boolean units {} def 1 }
 			}
 			DFC {
 				desc {6. Data Filter}
@@ -2661,7 +3122,7 @@ proc xcvrData {} {
 				desc {7. FIFO & Reset Mode}
 				cmd 0xCA00 
 				IT {desc {FIFO INT level} lsb 4 type scalar from 0 to 15 incr 1 units {} def 8}
-				Sp {desc {Synchron length} lsb 3 type choice opts {1 0 2 1} units byte def 1}
+				Sp {desc {Synchron length} lsb 3 type choice opts {1 1 2 0} units byte def 1}
 				Al {desc {FIFO fill start} lsb 2 type choice opts {{Sync pattern} 0 {Always fill} 1} units {} def {Sync pattern}}
 				Ff {desc {FIFO fill enable} lsb 1 type boolean units {} def 0}
 				Dr {desc {RESET sens.} lsb 0 type choice opts {High 0 Low 1} units {} def High}
@@ -2675,9 +3136,9 @@ proc xcvrData {} {
 				desc {10. AFC}
 				cmd 0xC400
 				A {desc {Auto AFC} lsb 6 type choice opts {Off 0 {Once} 1 {While VDI high} 2 {On} 3} units {} def On}
-				Rl {desc {Offset limit} lsb 4 type choice opts {{No limit} 0 {-16..+15} 1 {-8..+7} 2 {-4..+3} 3} units {chan} def {-4..+3}}
+				Rl {desc {Offset limits} lsb 4 type choice opts {{No limit} 0 {-16..+15} 1 {-8..+7} 2 {-4..+3} 3} units {chan} def {-4..+3}}
 				St {desc {Strobe edge} lsb 3 type boolean units {} def 0 }
-				Fi {desc {Fine mode} lsb 2 type boolean units {} def 1 }
+				Fi {desc {Fine mode} lsb 2 type boolean units {} def 0 }
 				Oe {desc {Freq. offset enable} lsb 1 type boolean units {} def 1 }
 				En {desc {Offset calc. enable} lsb 0 type boolean units {} def 1 }
 			}
@@ -2742,12 +3203,12 @@ proc xcvrGetId {} {
 	variable var
 	incr var(concnt) -1
 	if {$var(concnt)} {
-		send "v9,1s"
+		send "vg9,0s"
 		set var(afteropen) [after $var(contimeout) [namespace current]::xcvrGetId]
 	} else {
 		set var(hw) {}
 		con "\u2588 No hw Id"
-		setState 0 
+		portSetup disconnect 
 		event generate $var(top) <<PortChanged>> -data noId
 	}
 }
@@ -2759,7 +3220,7 @@ proc xmit {{what {}}} {
 	# transmit button pressed
 	if {$var(state) == 4} {
 		# we are currently transmitting, so stop the transmitter
-		con "\u03df Stop transmit"
+		con "\u03df Stop transmitting"
 		setState {} ; # empty string resets previous state
 		if {$var(rxstate) == 3} {
 			send 0s
@@ -2768,20 +3229,10 @@ proc xmit {{what {}}} {
 		}
 		return
 	}
-	if {$var(txdur) eq "On"} {
-		set ondur 10
-		set offdur 1
-	} else {
-		set ondur [expr {int($var(txdur))}]
-		set offdur 0
-	}		
-	if {$var(txmode) eq "FSK"} {
-		set fsksymb [scan 0xF %x]
-	} else {
-		set fsksymb ""
-	}
+	set offdur 100 ; # milliseconds
+	set fsksymb [scan 0x55 %x]
 	con "\u03df Transmit"
-	set s $var(xcvr,FSC,F)c[join "$fsksymb $offdur $ondur" ,]x
+	set s $var(xcvr,FSC,F)c[join "$fsksymb $offdur $var(ber,pcnt)" ,]x
 	if {[send $s]} {
 		setState 4
 	}
