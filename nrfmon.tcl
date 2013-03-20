@@ -387,6 +387,17 @@ proc buildImages {} {
 	LAEAAQARABEAAAMveAHc3kENQqutY91tGf/et4ViB5QXiRIq2pavGIMnIdw3
 	TeE5N/uBySqjeBgZkQQAOw==
 	}
+	catch {image delete [namespace current]::nrfmon_img}
+	image create photo [namespace current]::nrfmon_img -data {
+	R0lGODdhTwAXAOMQAAABAAkJEyESAD0hACQlRXA7AEVHg1RTnpdQAK9cAGBj
+	uXBy19dyAO1+AIaF+v+GACwAAAAATwAXAAAE/hDISau9OOvNu/9gKI5kaZ5o
+	qq5s676ZsTgOAbsKrSu2RNCKQ+DWyuloi4mBRizNDjLHYWKUHGhDo07CeCAQ
+	jUYBkGgwxpNCt5EYTLoJMHs0Q9IMkirg6hge6gtJAGsPhQ9dhgISCIUMDYVu
+	g4VmhQgidVkOgkZ1NUpMbw8NAgKTpIVjpV4SjwxcohIJh5cOClaaeUeaQxJL
+	DhRwrKsAqAAFkIuFrwnJriFPt5tMP7i9oK+WAI/ZxccPkYwP2MkNtFN71Xq+
+	Pb7Aw9sSxarZreMAjOXPUtG5vwABSKz5sweP2AM04Rwhk5QNnzl+APQAWDfx
+	GkNh3A6mWdMmVENYD01CihxJsqTJkyhTqjwZAQA7
+	}
 }
 
 # namespace ::mon
@@ -591,6 +602,8 @@ proc buildScreen W {
 	$W create image 0 0 -image $var(wfi) -anchor nw -tags {wfi fx NO}
 	# put the image cursor on the canvas but hide it
 	$W create image 0 0 -image [namespace current]::cross_img -anchor center -tags {cross fx NO}
+	# logo
+	$W create image 0 0 -image ::mon::nrfmon_img -tags nrfmon -anchor se -tags {nrfmon fx NO}
 	# create the specraline 
 	$W create line 0 0 0 0 -fill $var(color,fill,SL) -tags {SL fx NO}
 	drawScreen $W
@@ -1204,8 +1217,7 @@ proc drawScreen W {
 	$W create text -50 [expr {$var(wf,H) + 0 + 5}] -text "dBm" -anchor nw -font {TkDefaultFont -10 bold} -fill $ttcolor -tags {gat fx tt}
 	$W create text 5 -10 -text "MHz" -anchor sw -fill #444 -tags {hzt fx} -font {TkDefaultFont -12 bold}
 	$W create text [expr {$var(c,W) - $var(left,margin) - 10}] 5 -text "Events" -anchor ne -fill $ttcolor -tags {evt fx tt} -font {TkDefaultFont -11 bold}
-	$W create text [expr {$var(c,W) - $var(left,margin) - 81}] -3 -anchor se -text "nRf" -fill #88f -tags {RFmon Rf fx NO} -font {TkDefaultFont -14 bold}
-	$W create text [expr {$var(c,W) - $var(left,margin) - 45}] -3 -anchor se -text "mon" -fill #f80 -tags {RFmon mon fx NO} -font {TkDefaultFont -14 bold}
+	$W coords nrfmon [expr {$var(c,W) - $var(left,margin) - 37}] -1
 	$W create text [expr {$var(c,W) - $var(left,margin) - 5}] -3 -anchor se -text $var(version) -fill #666 -tags {RFmon ver fx NO} -font {TkDefaultFont -10 bold}
 	$W create text [expr {$var(c,W) - $var(left,margin) - 10}] [expr {$var(wf,H) + 0 + 5}] -text "Data" -anchor ne -fill $ttcolor -tags {sat fx tt} -font {TkDefaultFont -11 bold}
 	drawGrid $W
