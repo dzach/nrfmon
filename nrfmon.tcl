@@ -1506,7 +1506,7 @@ proc init {{scanwidth 423}} {
 	}
 	array set var {
 		title "nRfMon"
-		version v0.7a
+		version v0.7.1
 
 		state 0
 		state0 0
