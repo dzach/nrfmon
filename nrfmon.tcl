@@ -23,6 +23,8 @@
 #	►\u25BA	prompt
 #	◄\u25C4	
 #	ϟ\u03DF	user action
+#	Δ\u0394
+#	÷\u00F7
 #
 
 proc ::init {} {
@@ -260,7 +262,8 @@ proc buildCon W {
 	$var(con) tag config error -foreground #800
 
 	pack [::ttk::frame $W.f1] -anchor nw -side bottom -fill x
-	pack [::ttk::checkbutton $W.f1.concb -text "Show traffic" -variable [namespace current]::var(traffic,on)] -side left
+	pack [::ttk::checkbutton $W.f1.trfvcb -text "Traffic" -variable [namespace current]::var(traffic,on)] -side left
+	pack [::ttk::checkbutton $W.f1.usrcb -text "User actions" -variable [namespace current]::var(user,on)] -side left -padx 5
 	pack [::ttk::button $W.f1.clrb -text "Clear" -image [namespace current]::clear_img -style nobd.TButton -command "
 		$var(con) delete 0.0 end
 		[namespace current]::prompt
@@ -481,9 +484,7 @@ proc buildQuickSettings W {
 	place [set lf [::ttk::frame $w.f$i-$x -borderwidth 1 -relief ridge -padding 5]] -x $x -y 0 -width 210 -height 132
 	set w $lf.txset
 	pack [::ttk::frame $w -padding 0] -side top -fill x
-	pack [::ttk::checkbutton $w.sglcb -text "Set xcvr immediately" -padding 0 -variable [namespace current]::var(sendi,on)] -anchor w
-	pack [::ttk::frame $w.sndf] -fill x -pady 3
-	pack [::ttk::button $w.sndf.prnb -text "Print RFM12B cmds" -padding {4 4} -command "
+	pack [::ttk::button $w.prnb -text "Print RFM12B cmds" -padding {4 4} -command "
 		[namespace current]::print
 	"] -anchor w -padx 5 -pady 0 -side left
 }
@@ -801,7 +802,10 @@ proc colors {colors args} {
 proc con {s {check 0}} {
 	variable var
 
-	if {! $var(traffic,on) && [string index $s 0] in "> < \u25BA \u03df"} {
+	set p [string index $s 0]
+	if {(! $var(traffic,on) && $p in "> < \u25BA") ||
+		(! $var(user,on) && $p eq "\u03df")
+	} {
 		return
 	}
 	$var(con) insert end-1line "$s\n"
@@ -1141,6 +1145,7 @@ proc drawScanline {} {
 			# use colors per RS level
 			set sgl [expr {int($var(wf,nrcolors) * $var(fp,$i)/ $var(RSlev))}]
 		}
+		if {$sgl < 0} {set sgl 0}
 		# form the pixel line
 		lappend scanline $var(wfcolor,$sgl)
 	}
@@ -1554,6 +1559,7 @@ proc init {{scanwidth 423}} {
 		sendi,on 1
 		quiet,on 0
 		pause,on 0
+		user,on 1
 		
 		after,sendi {}
 		
@@ -2558,7 +2564,9 @@ proc receive port {
 				setState $var(rxstate)
 			}
 			"*q" {
-				$var(quietrb) config -style [expr {[dict get $var(xcvr,data) q]? "active.":""}]norm.TButton
+				set q [dict get $var(xcvr,data) q]
+				$var(quietrb) config -style [expr {$q? "active.":""}]norm.TButton
+				con "\u03df Quiet [expr {$q? {on}:{off}}]"
 			}
 			default {
 				if {[llength $var(scandata)] > 2} {
@@ -2724,6 +2732,11 @@ proc setEventText args {
 proc setQuiet W {
 	variable var
 
+	if {$var(state) != 3} {
+		# no action. Reset to previous value
+		set var(quiet,on) [expr {!$var(quiet,on)}]
+		return
+	}
 	send "$var(quiet,on)q"
 }
 
