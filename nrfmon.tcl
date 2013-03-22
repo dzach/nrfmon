@@ -34,7 +34,15 @@ proc ::init {} {
 		exit
 	}
 	wm withdraw .
-	cd [file dir [info script]]
+	if {[file tail $::argv0] eq "main.tcl"} {
+		# we are running inside a tclkit
+		cd [file dir [file dir $::argv0]]
+	} elseif {[info script] ne ""} {
+		# we are running as script
+		cd [file dir [info script]]
+	} else {	
+		cd [file dir [pwd]]
+	}
 }
 #
 init
@@ -1235,8 +1243,8 @@ proc drawScreen W {
 	$W create line 0 0 0 0 -fill $var(color,fill,curs) -dash {2 2} -tags [list yc ycl ycal fx curs]
 	$W create text -5  $var(c,H) -text "" -fill #fff -font {TkDefaultFont -9} -anchor e -tags [list yc yct ycat fx curs]
 	# maxrssi line
-	$W create line 0 0 0 0 -fill $var(color,fill,curs) -dash {2 2} -tags [list maxrssi maxrssil fx curs] 
-	$W create text [expr {$var(wf,W) + 5}] $var(sa,base) -anchor w -fill #fff -font {TkDefaultFont -10} -text "$var(Pmin) dBm" -tags {maxrssi maxrssit fx curs}
+	$W create line -1000 0 -1000 0 -fill $var(color,fill,curs) -dash {2 2} -tags [list maxrssi maxrssil fx curs] 
+	$W create text [expr {$var(wf,W) + 5}] $var(sa,base) -anchor w -fill #fff -font {TkDefaultFont -10} -text "" -tags {maxrssi maxrssit fx curs}
 	# time cursor
 	$W create line 0 0 0 0 -fill #fff -tags [list tc tca fx curs] -arrow last -arrowshape {6 7 3}
 	$W create line 0 0 0 0 -tags {tc tcl fx curs} -dash {2 2} -fill $var(color,fill,curs)
@@ -1245,7 +1253,7 @@ proc drawScreen W {
 	# hold max line
 	$W create line 0 0 0 0 -fill $var(color,fill,SPM) -tags {sa SPM NO}
 	# spectrum line
-	$W create poly 0 0 0 0 -fill $var(color,fill,SP) -tags {sa SP} -outline $var(color,outline,SP)
+	$W create poly -1000 0 -1000 0 -fill $var(color,fill,SP) -tags {sa SP} -outline $var(color,outline,SP)
 	# spectrum x axis
 	$W create line 0 $var(sa,base) $var(wf,W) $var(sa,base) -tags [list sax fx] -fill #222
 	# milliseconds per line
@@ -1257,7 +1265,7 @@ proc drawScreen W {
 	$W create line 0 0 0 0 -fill $var(color,fill,BWa) -tags {BW BWa BWa1 fx NO} -width 1
 	$W create line 0 0 0 0 -fill $var(color,fill,BWa) -tags {BW BWa BWa2 fx NO} -width 1
 	$W create line 0 0 0 0 -fill $var(color,fill,BWa) -tags {BW BWa BWa3 fx NO} -width 1
-	$W create rect 0 0 0 0 -tags {maxrssi maxrssir fx c} -outline #8f4
+	$W create rect -1000 0 -1000 0 -tags {maxrssi maxrssir fx c} -outline #8f4
 	# create current scan line
 	$W create line 0 0 $var(wf,W) 0 -tags {cscl NO} -fill $var(color,fill,cscl) -width 1
 	$W raise cross
@@ -2787,7 +2795,7 @@ proc showListen {} {
 	$var(scanb) configure -style bold.TButton
 	$var(xmitb) configure -style bold.TButton
 	$var(scr) itemconfig {ber} -state normal
-	$var(scr) itemconfig {curs || gxt || gyl || gyt || SZ || BW || SP || SL || SPM} -state hidden
+	$var(scr) itemconfig {curs || gxt || gyl || gyt || SZ || BW || SP || SL || SPM || maxrssi} -state hidden
 	$var(scr) itemconfig gat -text "PER"
 	$var(scr) itemconfig hzt -text "Packet bitstream"
 }
