@@ -2275,7 +2275,7 @@ proc parseData {} {
 
 	# catch empty packets or packets with empty fields in the header
 	if {![binary scan [string range $var(data,data) end-1 end] H4 crc] ||
-		![binary scan [string range $var(data,data) 0 2] cucucu grp id plen] ||
+		![binary scan [string range $var(data,data) 0 2] H2H2H2 grp id plen] ||
 		![info exists grp] || ![info exists id] || ![info exists plen] ||
 		($plen eq "00" && $crc eq "0000")
 	} {
@@ -2380,7 +2380,7 @@ proc parseData {} {
 				binary scan [string range $var(data,data) 3 end-2] cu* out
 			}
 		}
-		con "\u25BC g $grp id [scan $id %x] len $plen crc 0x$crc\n$out"
+		con "\u25BC g [scan $grp %x]  id [scan $id %x] len [scan $plen %x] crc 0x$crc\n$out"
 	}
 	if {!$crcb} {
 		set var(ber,pnr) $pnr
