@@ -302,16 +302,16 @@ proc buildControls W {
 
 	pack [set ww [::ttk::frame $w.row2 -padding {0 2}]] -anchor nw
 	pack [set var(xmitb) [::ttk::radiobutton $ww.bertb -style bold.TButton -text "Xmit" -variable [namespace current]::var(bstate) -value "4" -command [namespace current]::toggleCmdButton -width 8 -padding {0 3}]] -anchor w -fill x -side left -padx 2
-	pack [::ttk::checkbutton $ww.pausrb -text "Pause Rx" -style norm.TButton -variable [namespace current]::var(pause,on) -width 11 -padding {1 4} -command "
-		[namespace current]::Pause $ww.pausrb
-	"] -anchor w -fill x -side left -padx 2
+	pack [::ttk::button $ww.clrb -text "Clear scr" -command [list [namespace current]::clear screen] -width 11 -padding {1 2}] -anchor w -fill x -side left -padx 2
 	
 	pack [set ww [::ttk::frame $w.row3 -padding {0 2}]] -anchor nw
 	set var(quietrb) $ww.quietrb
-	pack [::ttk::checkbutton $ww.quietrb -text "Quiet Rx" -style norm.TButton -padding {1 2} -variable [namespace current]::var(quiet,on) -width 11 -command "
+	pack [::ttk::checkbutton $ww.quietrb -text "Quiet Rx" -style norm.TButton -padding {1 4} -variable [namespace current]::var(quiet,on) -width 11 -command "
 		[namespace current]::setQuiet $ww.quietrb
 	"] -anchor w -fill x -side left -padx 2
-	pack [::ttk::button $ww.clrb -text "Clear scr" -command [list [namespace current]::clear screen] -width 11 -padding {1 2}] -anchor w -fill x -side left -padx 2
+	pack [::ttk::checkbutton $ww.pausrb -text "Pause Rx" -style norm.TButton -variable [namespace current]::var(pause,on) -width 11 -padding {1 4} -command "
+		[namespace current]::Pause $ww.pausrb
+	"] -anchor w -fill x -side left -padx 2
 
 	set w [::ttk::labelframe $W.spf -text "Spectrum:" -padding {5 2}]
 	pack $w -side top -fill x -pady 0 -anchor nw
@@ -1527,7 +1527,7 @@ proc init {{scanwidth 423}} {
 	}
 	array set var {
 		title "nRfMon"
-		version v0.7.1
+		version v0.7.2
 
 		state 0
 		state0 0
