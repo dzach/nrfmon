@@ -302,16 +302,16 @@ proc buildControls W {
 
 	pack [set ww [::ttk::frame $w.row2 -padding {0 2}]] -anchor nw
 	pack [set var(xmitb) [::ttk::radiobutton $ww.bertb -style bold.TButton -text "Xmit" -variable [namespace current]::var(bstate) -value "4" -command [namespace current]::toggleCmdButton -width 8 -padding {0 3}]] -anchor w -fill x -side left -padx 2
-	pack [::ttk::checkbutton $ww.pausrb -text "Pause Rx" -style norm.TButton -variable [namespace current]::var(pause,on) -width 11 -padding {1 4} -command "
-		[namespace current]::Pause $ww.pausrb
-	"] -anchor w -fill x -side left -padx 2
+	pack [::ttk::button $ww.clrb -text "Clear scr" -command [list [namespace current]::clear screen] -width 11 -padding {1 2}] -anchor w -fill x -side left -padx 2
 	
 	pack [set ww [::ttk::frame $w.row3 -padding {0 2}]] -anchor nw
 	set var(quietrb) $ww.quietrb
-	pack [::ttk::checkbutton $ww.quietrb -text "Quiet Rx" -style norm.TButton -padding {1 2} -variable [namespace current]::var(quiet,on) -width 11 -command "
+	pack [::ttk::checkbutton $ww.quietrb -text "Quiet Rx" -style norm.TButton -padding {1 4} -variable [namespace current]::var(quiet,on) -width 11 -command "
 		[namespace current]::setQuiet $ww.quietrb
 	"] -anchor w -fill x -side left -padx 2
-	pack [::ttk::button $ww.clrb -text "Clear scr" -command [list [namespace current]::clear screen] -width 11 -padding {1 2}] -anchor w -fill x -side left -padx 2
+	pack [::ttk::checkbutton $ww.pausrb -text "Pause Rx" -style norm.TButton -variable [namespace current]::var(pause,on) -width 11 -padding {1 4} -command "
+		[namespace current]::Pause $ww.pausrb
+	"] -anchor w -fill x -side left -padx 2
 
 	set w [::ttk::labelframe $W.spf -text "Spectrum:" -padding {5 2}]
 	pack $w -side top -fill x -pady 0 -anchor nw
@@ -506,6 +506,10 @@ proc buildQuickSettings W {
 	pack [::ttk::button $w.prnb -text "Print RFM12B cmds" -padding {4 4} -command "
 		[namespace current]::print
 	"] -anchor w -padx 5 -pady 0 -side left
+	set w $lf.datf
+	pack [::ttk::frame $w -padding 0] -fill x -pady 5
+	pack [::ttk::label $w.datl -text "Print packet data as:" -padding {}] -anchor w -side left
+	pack [::ttk::combobox $w.datcb -textvariable [namespace current]::var(data,prnt) -values $var(data,prntvals) -width 3] -anchor w -side left -padx 5
 }
 
 # namespace ::mon
@@ -770,8 +774,9 @@ proc clear what {
 	switch -glob -- $what {
 		"scr*" -	"all" {
 			$var(wfi) put #000 -to 0 0 480 300
-			$var(scr) coords csal 0 0 0 0
-			$var(scr) coords SP 0 0 0 0
+			$var(scr) coords csal -1000 0 -1000 0
+			$var(scr) coords SP -1000 0 -1000 0
+			$var(scr) coords SPM -1000 0 -1000 0
 			$var(scr) delete M E
 			initFreqArray
 		}
@@ -836,13 +841,21 @@ proc con {s {check 0}} {
 
 # namespace ::mon
 proc createDimensions wfw {
+	# calculate screen dimensions depending on waterfall width
 	variable var
+	# the golden rule
 	set gr 1.618
+	# waterfall height
 	set wfh [expr {round($wfw / $gr)}]
+	# canvas height
 	set ch [expr {$wfw + $var(top,margin) + $var(bottom,margin)}]
+	# spactrum plot height (width is the same with waterfall)
 	set sah [expr {$wfw - $wfh}]
+	# canvas width
 	set cw [expr {round($wfw + $wfh + $var(mark,margin))}]
+	# window height
 	set toph [expr {$ch + $var(mark,margin)}]
+	# window width follows the golden rule, based on window height
 	return [list wf,W $wfw wf,H $wfh sa,H $sah sa,base $wfw c,W $cw c,H $ch win,W [expr {round($toph * $gr)}] win,H $toph sl,end [expr {$wfw + $sah + $var(sl,left)}]] 
 }
 
@@ -1251,7 +1264,7 @@ proc drawScreen W {
 	$W create text -5  0 -text "" -fill #fff -font {TkDefaultFont -9} -anchor e -tags [list tc tct fx curs]
 	$W itemconfig [list xcl || ycl] -dash {2 2}
 	# hold max line
-	$W create line 0 0 0 0 -fill $var(color,fill,SPM) -tags {sa SPM NO}
+	$W create line -1000 0 -1000 0 -fill $var(color,fill,SPM) -tags {sa SPM NO}
 	# spectrum line
 	$W create poly -1000 0 -1000 0 -fill $var(color,fill,SP) -tags {sa SP} -outline $var(color,outline,SP)
 	# spectrum x axis
@@ -1368,7 +1381,7 @@ proc enumerate what {
 
 	switch -glob -nocase -- $what {
 		"ports" {
-			lappend out {*}[glob -nocomplain /dev/ttyUSB* /dev/ttyACM* /dev/tty.usbserial*]
+			lappend out {*}[glob -nocomplain /dev/ttyUSB* /dev/ttyACM* /dev/tty.usbserial*] {*}[WinListSerialPorts]
 			if {[llength $out]} {
 				set out [concat {{}} $out]
 			}
@@ -1514,7 +1527,7 @@ proc init {{scanwidth 423}} {
 	}
 	array set var {
 		title "nRfMon"
-		version v0.7.1
+		version v0.7.2
 
 		state 0
 		state0 0
@@ -1580,7 +1593,8 @@ proc init {{scanwidth 423}} {
 		quiet,on 0
 		pause,on 0
 		user,on 1
-		
+		data,prnt {}
+		data,prntvals {{} raw bin hex dec}
 		after,sendi {}
 		
 		lch 96
@@ -1610,7 +1624,6 @@ proc init {{scanwidth 423}} {
 			256000
 		}
 		portspeed 57600
-		
 		ber,plen 52
 		ber,on 1
 		ber,after {}
@@ -2262,7 +2275,7 @@ proc parseData {} {
 
 	# catch empty packets or packets with empty fields in the header
 	if {![binary scan [string range $var(data,data) end-1 end] H4 crc] ||
-		![binary scan [string range $var(data,data) 0 2] H2H2H2 grp id plen] ||
+		![binary scan [string range $var(data,data) 0 2] cucucu grp id plen] ||
 		![info exists grp] || ![info exists id] || ![info exists plen] ||
 		($plen eq "00" && $crc eq "0000")
 	} {
@@ -2274,10 +2287,8 @@ proc parseData {} {
 		# duration of a BERT cycle * 1.5	
 		set var(ber,watchdog) [after [expr {int(1.0 / $var(xcvr,DRC,BR) * 8 * $var(ber,pcnt) * ($var(ber,plen) + 7 + 9)*1.5)}] [namespace current]::watchBER]
 	}
-	if {!$crcb && [string index $var(data,data) 3] eq "ÿ"} {
-		# possibly user typed data, print it to the console
+	if {!$crcb} {
 		set pnr $var(ber,pnr)
-		con "\u25BC g $grp id [scan $id %x]\n[string range $var(data,data) 4 end-2]"
 	} elseif {![binary scan [string index $var(data,data) 3] H2 pnr] || $pnr eq ""} {
 		advanceLine
 		return
@@ -2321,13 +2332,13 @@ proc parseData {} {
 	binary scan $var(data,data) B* var(ber,bdata)
 	# make a bitstream copy of test pattern
 	binary scan [binary format H6 00012F][string index $var(data,data) 3][string repeat U 46][binary format H4 0000] B* btest
-	set len [string length $var(data,data)]
+	set blen [string length $var(data,data)]
 	# advance enough lines to fit the length of the packet
-	set r1 [expr {$var(r) + 2 + int($len * 8.0/ $var(wf,W))}]
+	set r1 [expr {$var(r) + 2 + int($blen * 8.0/ $var(wf,W))}]
 	$var(scr) coords cscl 0 $r1 $var(wf,W) $r1
 	# blank the lines
 	$var(wfi) put #000 -to 0  $var(r) $var(wf,W) $r1
-	for {set bi 0; set x 0} {$bi < $len * 8} {incr bi; incr x} {
+	for {set bi 0; set x 0} {$bi < $blen * 8} {incr bi; incr x} {
 		if {$x >= $var(wf,W)} {
 			# packet is longer than the waterfall width
 			set var(r) [expr {($var(r) + 1) % $var(wf,H)}]
@@ -2348,6 +2359,29 @@ proc parseData {} {
 		$var(wfi) put -to $x $var(r) $var(color,fill,ber$cc)
 	}
 	advanceLine
+	if {$var(data,prnt) ne {}} {
+		set out ""
+		switch -- $var(data,prnt) {
+			"raw" {
+				set out [string range $var(data,data) 3 end-2]
+			}
+			"bin" {
+				for {set i 0} {$i < $blen} {incr i 8} {
+					append out [string range $var(ber,bdata) $i $i+7] " "
+				}
+			}
+			"hex" {
+				binary scan [string range $var(data,data) 3 end-2] H* val
+				for {set i 0} {$i < [string length $val]} {incr i 4} {
+					append out [string range $val $i $i+3] " "
+				}
+			}
+			"dec" {
+				binary scan [string range $var(data,data) 3 end-2] cu* out
+			}
+		}
+		con "\u25BC g $grp id [scan $id %x] len $plen crc 0x$crc\n$out"
+	}
 	if {!$crcb} {
 		set var(ber,pnr) $pnr
 	}
@@ -3079,6 +3113,52 @@ proc watchBER {} {
 	}
 	set var(r) [expr {($var(r) + 1) % $var(wf,H)}]
 	plotBER "BER = no data\nPER = no data"
+}
+
+# namespace ::mon
+proc WinListSerialPorts {} {
+# 2010-04-21 improved version, see http://talk.jeelabs.net/topic/208
+# 2012-03-16 further improved, added detection for Brainboxes and ACPI
+
+#
+#  List Windows serial ports
+#
+#  Identifies the following devices:
+#    ftdi, acpi, usb, bbx (Brainbox)
+#
+#  Resulting list:
+#    <prefix>-<serial> COM<xy>
+#
+	if {[catch {
+		# this works only on Windows
+		package require registry
+	}]} {
+		return
+	}
+	set result {}
+	set ccs {HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet}
+	foreach {type prefix match} {
+		Serenum  ftdi {^FTDIBUS.*_6001.(\w+)}
+		Serenum  acpi {^ACPI.*(\w+)}
+		usbser   usb  {^USB\B.*\B(.*)$}
+		BbEnum20 bbx  {^Ports\\BbUSer([0-9]*).*}
+	} {
+		# ignore registry access errors
+		catch {
+		set enum "$ccs\\Services\\$type\\Enum"
+		set n [registry get $enum Count]
+		for {set i 0} {$i < $n} {incr i} {
+			set desc [registry get $enum $i]
+			if {[regexp $match $desc - serial]} {
+				set p [registry get "$ccs\\Enum\\$desc\\Device Parameters" PortName]
+				# Log . {usb-$serial Port: $p Friendly: [registry get "$ccs\\Enum\\$desc" FriendlyName]}
+#				lappend result $prefix-$serial $p
+				lappend result "//./$p"
+			}
+		}
+		}
+	}
+	return $result
 }
 
 # namespace ::mon
