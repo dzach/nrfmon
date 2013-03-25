@@ -144,6 +144,24 @@ static void xmitFSK() {
   }
 }
 
+void setGroup (byte group) {
+  if (group) {
+    // two SYN bytes, Byte0 is group. Clear the sp bit.
+    config.FIFO &= 0xFFF7;
+    rf12_control(config.FIFO);
+    // two SYN bytes, Byte0 is group. 
+    rf12_control(0xCE00 | group);
+  } else {
+    // goup == 0, single SYN packet. Set the sp bit.
+    config.FIFO |= 0x8;
+    rf12_control(config.FIFO);
+    // single SYN, 0x2D;
+    rf12_control(0xCE2D);
+  }
+  // store composit gbid parameter
+  config.gbid = (config.gbid & 0x00FF) | ((word) group) << 8;
+}
+
 static word setReg(word cmd) {
   // find a match for the command word
  if ((cmd & 0xF800) == 0x9000)
@@ -211,24 +229,6 @@ static word readStatus() {
   return st;
 }
 
-void setGroup (byte group) {
-  if (group) {
-    // two SYN bytes, Byte0 is group. Clear the sp bit.
-    config.FIFO &= 0xFFF7;
-    rf12_control(config.FIFO);
-    // two SYN bytes, Byte0 is group. 
-    rf12_control(0xCE00 | group);
-  } else {
-    // goup == 0, single SYN packet. Set the sp bit.
-    config.FIFO |= 0x8;
-    rf12_control(config.FIFO);
-    // single SYN, 0x2D;
-    rf12_control(0xCE2D);
-  }
-  // store composit gbid parameter
-  config.gbid = (config.gbid & 0x00FF) | ((word) group) << 8;
-}
-
 int xmitData(word len,byte num) {
   if (!num) {
     len = RFMON_PLEN;
@@ -271,6 +271,31 @@ void recvData() {
     rf12_sendStart(RF12_ACK_REPLY, 0, 0);
   }      
   activityLed(0);
+}
+
+// custom replacement of JeeLib rf12_initialize()
+static void rfmon_reset () {
+  // set the rest of the config structure
+  config.RCC = 0x94A0;  // Pin16 = VDI, VDIresp = fast, BW = 134kHz, LNAGain = 0dB; RSSIthreshold = -103 dBm
+  config.FSC = 0xA000 | 1600;   // mid band channel
+  config.TXC = 0x9857;  // FSK = 90kHz, Pwr = -17.5dB, FSK shift = positive
+  config.AFC = 0xC483;  // AFC follow VDI, no limit, !st, !fi,oe,en
+  config.DRC = 0xC606;  // R = 6, no prescale : Bit Rate 49265 bps
+  config.FIFO = 0xCA8B; // FIFO = 8, SYN = 1 , fill pattern, fill enable, RESET sens. low
+  config.CSC = 0x80E7;  // 868 MHz band, TX reg enabled, RX FIFO enabled, 12pf xtal cap.
+  config.PMC = 0x82DD;  // enable RX, RX baseband, synth, xtal osc, low batt. det., disable clock output
+  
+  config.zone[0] = 96;
+  config.zone[1] = 3903;
+  config.zone[2] = 9;
+  config.gbid = 0x0081; // group 0, 868 MHz, node 1
+  config.chan = 1600; 
+  // initialize only registers here
+  for (byte i = 0; i < sizeof(config)/sizeof(word) - 5; i++) {
+    rf12_control(((word *) &config)[i]);
+  }
+  // now initialize group, band and band
+  setGroup(config.gbid >> 8);
 }
 
 static void handleInput (char c) {
@@ -412,31 +437,6 @@ static void handleInput (char c) {
         value = top = num = 0;
         memset(stack, 0, sizeof stack);
       }
-}
-
-// custom replacement of JeeLib rf12_initialize()
-static void rfmon_reset () {
-  // set the rest of the config structure
-  config.RCC = 0x94A0;  // Pin16 = VDI, VDIresp = fast, BW = 134kHz, LNAGain = 0dB; RSSIthreshold = -103 dBm
-  config.FSC = 0xA000 | 1600;   // mid band channel
-  config.TXC = 0x9857;  // FSK = 90kHz, Pwr = -17.5dB, FSK shift = positive
-  config.AFC = 0xC483;  // AFC follow VDI, no limit, !st, !fi,oe,en
-  config.DRC = 0xC606;  // R = 6, no prescale : Bit Rate 49265 bps
-  config.FIFO = 0xCA8B; // FIFO = 8, SYN = 1 , fill pattern, fill enable, RESET sens. low
-  config.CSC = 0x80E7;  // 868 MHz band, TX reg enabled, RX FIFO enabled, 12pf xtal cap.
-  config.PMC = 0x82DD;  // enable RX, RX baseband, synth, xtal osc, low batt. det., disable clock output
-  
-  config.zone[0] = 96;
-  config.zone[1] = 3903;
-  config.zone[2] = 9;
-  config.gbid = 0x0081; // group 0, 868 MHz, node 1
-  config.chan = 1600; 
-  // initialize only registers here
-  for (byte i = 0; i < sizeof(config)/sizeof(word) - 5; i++) {
-    rf12_control(((word *) &config)[i]);
-  }
-  // now initialize group, band and band
-  setGroup(config.gbid >> 8);
 }
 
 void setup () {
