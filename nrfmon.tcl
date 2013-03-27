@@ -3170,7 +3170,7 @@ proc WinListSerialPorts {} {
 				set p [registry get "$ccs\\Enum\\$desc\\Device Parameters" PortName]
 				# Log . {usb-$serial Port: $p Friendly: [registry get "$ccs\\Enum\\$desc" FriendlyName]}
 #				lappend result $prefix-$serial $p
-				lappend result "//./$p"
+				lappend result $p
 			}
 		}
 		}
