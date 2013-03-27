@@ -339,13 +339,21 @@ proc buildControls W {
 	pack [::ttk::checkbutton $w.mxf.mxcb -text "Hold max" -padding 0 -variable [namespace current]::var(maxs,on) -command "
 		[namespace current]::resetMaxs
 	"] -anchor w -side left
-	pack [::ttk::checkbutton $w.bwcb -text "Show RX bandwidth" -padding 0 -variable [namespace current]::var(bw,on) -command "
+	pack [::ttk::frame $w.rxf] -anchor w
+	pack [::ttk::checkbutton $w.rxf.bwcb -text "Rx Bw" -padding 0 -variable [namespace current]::var(bw,on) -command "
 		if {\$[namespace current]::var(bw,on)} {
 			\$[namespace current]::var(scr) itemconfig BWr -state normal
 		} else {
 			\$[namespace current]::var(scr) itemconfig BWr -state hidden
 		}
-	"] -anchor w -side top
+	" -width 10] -anchor w -side left
+	pack [::ttk::checkbutton $w.rxf.spcb -text "Spectrum" -padding 0 -variable [namespace current]::var(SP,on) -command "
+		if {\$[namespace current]::var(SP,on)} {
+			\$[namespace current]::var(scr) itemconfig SP -state normal
+		} else {
+			\$[namespace current]::var(scr) itemconfig SP -state hidden
+		}
+	"] -anchor w -side left
 	set wdth 7
 	pack [::ttk::label $w.sll -text "Show signal strength:"] -anchor w -side top
 	pack [::ttk::frame $w.of] -anchor w
@@ -1588,6 +1596,7 @@ proc init {{scanwidth 423}} {
 		marklines,on 1
 		traffic,on 0
 		sl,on 2
+		SP,on 1
 		bw,on 0
 		sendi,on 1
 		quiet,on 0
@@ -2847,7 +2856,8 @@ proc showScan {} {
 	$var(scr) itemconfig SP -outline $var(color,outline,SP)
 	$var(scr) itemconfig SPM -fill $var(color,fill,SPM)
 	$var(scr) itemconfig {ber} -state hidden
-	$var(scr) itemconfig {gyl || gyt || gxt || ycal || ycat || maxrssi || RSth || SP || SL} -state normal
+	$var(scr) itemconfig {gyl || gyt || gxt || ycal || ycat || maxrssi || RSth || SL} -state normal
+	$var(scr) itemconfig SP -state [expr {$var(SP,on)? "normal":"hidden"}]
 	$var(scr) itemconfig SPM -state [expr {$var(maxs,on)? "normal":"hidden"}]
 	$var(scr) itemconfig gat -text "dBm"
 	$var(scr) itemconfig hzt -text "MHz"

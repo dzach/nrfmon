@@ -144,7 +144,7 @@ static void xmitFSK() {
   }
 }
 
-void setGroup (byte group) {
+static void setGroup (byte group) {
   if (group) {
     // two SYN bytes, Byte0 is group. Clear the sp bit.
     config.FIFO &= 0xFFF7;
@@ -229,7 +229,7 @@ static word readStatus() {
   return st;
 }
 
-int xmitData(word len,byte num) {
+static int xmitData(word len,byte num) {
   if (!num) {
     len = RFMON_PLEN;
     for (byte i=0; i<len; i++)
@@ -253,7 +253,7 @@ int xmitData(word len,byte num) {
   return len;
 }
 
-void recvData() {
+static void recvData() {
   Serial.print("< ");
   Serial.print(rf12_len);
   Serial.print(F("d d {"));
