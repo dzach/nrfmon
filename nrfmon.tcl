@@ -1535,7 +1535,7 @@ proc init {{scanwidth 423}} {
 	}
 	array set var {
 		title "nRfMon"
-		version v0.7.2
+		version v0.7.3
 
 		state 0
 		state0 0
@@ -2339,7 +2339,7 @@ proc parseData {} {
 	}
 	# make a bitstream copy of input data
 	binary scan $var(data,data) B* var(ber,bdata)
-	# make a bitstream copy of test pattern
+	# make a bitstream copy of test pattern, by copying group, id, len, pcnt pattern and CRC (0)
 	binary scan [binary format H6 00012F][string index $var(data,data) 3][string repeat U 46][binary format H4 0000] B* btest
 	set blen [string length $var(data,data)]
 	# advance enough lines to fit the length of the packet
@@ -2375,7 +2375,8 @@ proc parseData {} {
 				set out [string range $var(data,data) 3 end-2]
 			}
 			"bin" {
-				for {set i 0} {$i < $blen} {incr i 8} {
+				# skip header and CRC which are printed separatelly
+				for {set i 24} {$i < ($blen - 2) * 8} {incr i 8} {
 					append out [string range $var(ber,bdata) $i $i+7] " "
 				}
 			}
