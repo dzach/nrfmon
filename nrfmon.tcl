@@ -517,7 +517,7 @@ proc buildQuickSettings W {
 	set w $lf.datf
 	pack [::ttk::frame $w -padding 0] -fill x -pady 5
 	pack [::ttk::label $w.datl -text "Print packet data as:" -padding {}] -anchor w -side left
-	pack [::ttk::combobox $w.datcb -textvariable [namespace current]::var(data,prnt) -values $var(data,prntvals) -width 3] -anchor w -side left -padx 5
+	pack [::ttk::combobox $w.datcb -textvariable [namespace current]::var(data,prnt) -values $var(data,prntvals) -width 4 -justify right] -anchor w -side left -padx 5
 }
 
 # namespace ::mon
@@ -1834,6 +1834,7 @@ proc mark {e args} {
 			if {$var(portname) ne "" && $var(port) ne ""} {
 				drawMark "[file tail $var(portname)]" -tag 1 -tags P
 			} else {
+				# disconnect
 				portSetup
 			}
 		}
@@ -2461,7 +2462,7 @@ proc portSetup {{what {}}} {
 	catch {
 		close $var(port)
 	}
-	if {[string match "disc*" $what] || [string match "disc*" $var(portname)] || ![llength $var(portname)]} {
+	if {[string match "disc*" $what] || [string match "disc*" $var(portname)] || ![string length [string trim $var(portname)]]} {
 		set var(portname) {}
 		con "\u03df Disconnect"
 		setState 0
@@ -2471,11 +2472,16 @@ proc portSetup {{what {}}} {
 	if {$var(gui)} {
 		event generate $var(top) <<PortChanged>> -data disc
 	}
+	set portname $var(portname)
+	if {[regexp -nocase -- {com[1-9][0-9]*} $portname portname]} {
+		# windows friently port name? put it in the proper form
+		set portname "//./$portname"
+	}
 	if {[catch {
 		if {$::tcl_platform(os) eq "Darwin"} {
-			set var(port) [open $var(portname) {RDWR NONBLOCK}]
+			set var(port) [open $portname {RDWR NONBLOCK}]
 		} else {
-			set var(port) [open $var(portname) RDWR]
+			set var(port) [open $portname RDWR]
 		}
 	} err]} {
 		setState 0 $err
@@ -2494,7 +2500,7 @@ proc portSetup {{what {}}} {
 	send "vg9,0s"
 	set var(concnt) 4
 	set var(afteropen) [after $var(contimeout) [namespace current]::xcvrGetId]
-	con "\u03df Connect ($var(portname))"
+	con "\u03df Connect ($portname)"
 	setState 1
 }
 
