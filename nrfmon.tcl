@@ -1458,16 +1458,10 @@ proc freq2chband f {
 			break
 		}
 	}
-	## what if the frequency entered was outside the limits of the bands this xceiver is capable of handling?
+	## if the frequency entered was outside the limits of the bands this xceiver is capable of handling
 	if {![info exists ch]} {
-		## set the default band and channel so the receiver can operate
-		set CSC [dict get $var(rf12b) cmds CSC]
-		# find default band index
-		set b [dict get $CSC FB opts [dict get $CSC FB def]]
-		# get default band name
-		set band [dict get $var(rf12b) bands $b name]
-		# get default channel
-		set ch [dict get $var(rf12b) cmds FSC F def]
+		## don't change anything
+		return
 	}
 	return [list $band $ch $b]
 }
@@ -1535,7 +1529,7 @@ proc init {{scanwidth 423}} {
 	}
 	array set var {
 		title "nRfMon"
-		version v0.7.4
+		version v0.7.5
 
 		state 0
 		state0 0
@@ -2183,19 +2177,25 @@ proc onTrace args {
 	set controls [dict get $data cmds]
 	# item is the variable that changed and got us here
 	lassign [split $item ,] i cmd field
-
+	lappend cmds $cmd
 	switch -glob -- $cmd,$field {
 		FSC,F - CSC,FB {
-			# set frequency from the channel field
+			# set frequency from the channel field 
 			set band [dict get $controls CSC FB opts $var(xcvr,CSC,FB)]
 			set var(xcvr,FSC,Freq) [format %0.4f [chan2freq $var(xcvr,FSC,F) $band]]
 		}
 		FSC,Freq {
 			## set channel and band
-			lassign [freq2chband $var(xcvr,FSC,Freq)] var(xcvr,CSC,FB) var(xcvr,FSC,F) b
-			set var(xcvr,band) $b
-			if {[dict exists $controls FSC Freq format]} {
-				set var(xcvr,FSC,Freq) [format [dict get $controls FSC Freq format] $var(xcvr,FSC,Freq)]
+			set cb [freq2chband $var(xcvr,FSC,Freq)]
+			if {$cb ne {}} {
+				lassign $cb var(xcvr,CSC,FB) var(xcvr,FSC,F) b
+				set var(xcvr,band) $b
+				lappend cmds CSC
+				if {[dict exists $controls FSC Freq format]} {
+					set var(xcvr,FSC,Freq) [format [dict get $controls FSC Freq format] $var(xcvr,FSC,Freq)]
+				}
+			} else {
+				set cmds {}
 			}
 		}
 		DRC,Cs - DRC,R {
@@ -2223,13 +2223,18 @@ proc onTrace args {
 			createExpColors $var(xcvr,nRfMon,Cst) $var(xcvr,nRfMon,Wht)
 		}
 	}
+	foreach cmd $cmds {
 	set var(xcvr,$cmd) [makeCtlWord $datavar $cmd hex]
 	# should we send the change immediatelly to the xcvr? yes, if in the Quick settings panel
 	if {$var(sendi,on) && [string match "\[A-Z]*" $cmd] && [$var(setnb) index [$var(setnb) select]] == 1} {
-		after cancel $var(after,sendi)
-		set var(after,sendi) [after 500 "
+		foreach a $var(after,sendi) {
+			after cancel $a
+		}
+		lappend var(after,sendi) [after 500 "
 			[namespace current]::send \[scan \$[namespace current]::var(xcvr,$cmd) %x]r
+			set [namespace current]::var(after,sendi) \[lrange \$[namespace current]::var(after,sendi) 1 end]
 		"]
+	}
 	}
 	if {$var(gui)} {
 		event generate $var(scr) <<ValueChanged>> -data $cmd,$field
