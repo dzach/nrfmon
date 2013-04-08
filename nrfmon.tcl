@@ -795,23 +795,6 @@ proc clear what {
 }
 
 # namespace ::mon
-proc cloneItem {W item tags} {
-	foreach it $item {
-	foreach i [$W find withtag $it] {
-		set new [$W create [$W type $i] [$W coords $i]]
-		set opts {}
-		foreach o [$W itemconfig $i] {
-			lassign $o opt _ _ _ val
-			lappend opts $opt $val
-		}
-		lappend opts -tags $tags
-		$W itemconfig $new {*}$opts
-	}
-	}
-	return $new
-}
-
-# namespace ::mon
 proc colors {colors args} {
 	## given the number of desired colors, return a palette of colors, given a series of coordinates for an intensity curve
 	## we assume a 255 color palette
