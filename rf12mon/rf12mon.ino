@@ -8,7 +8,7 @@
   Change the last part in the next line to reflect the hardware signature that'll be shown on the RfMon screen.
   The signature is a dictionary, i.e. should be pairs of key/value, where the last pair is the hardware type
 */
-#define RFMON_SIGNATURE F("xcvr rf12b ver 0.7a hw JeeNode.v6")
+#define RFMON_SIGNATURE F("xcvr rf12b ver 0.7.6 hw JeeNode.v6")
 
 //#define LED_PIN     9   // activity LED, comment out to disable
 
@@ -176,8 +176,10 @@ static word setReg(word cmd) {
     config.DRC = cmd;
  else if ((cmd & 0xFF00) == 0xCA00)
     config.FIFO = cmd;
- else if ((cmd & 0xFF00) == 0x8000)
+ else if ((cmd & 0xFF00) == 0x8000) {
     config.CSC = cmd;
+    config.gbid = config.gbid & 0xFF3F | (cmd & 0x0030) << 2;
+ }
  else if ((cmd & 0xFF00) == 0xCE00)
     setGroup(cmd);
  else if ((cmd & 0xFF00) == 0x8200)
@@ -200,7 +202,7 @@ static void printSettings (byte c) {
   }
   // band, channel, power att.
   if (c & RFMON_PRXMIT) {
-    Serial.print(F(" b "));Serial.print(config.gbid >> 6 & 0x0003, DEC);Serial.print(F(" c "));Serial.print(config.FSC & 0x0FFF);Serial.print(F(" p "));Serial.print(config.TXC & 0x07);
+    Serial.print(F(" b "));Serial.print((config.gbid >> 6) & 0x0003, DEC);Serial.print(F(" c "));Serial.print(config.FSC & 0x0FFF);Serial.print(F(" p "));Serial.print(config.TXC & 0x07);
   }
   if (c & RFMON_PRXFSK) {
     Serial.print(F(" pcnt ")); Serial.print(pcnt); Serial.print(F(" offdur ")); Serial.print(offdur); Serial.print(F(" ")); Serial.print(F(" fsk 0x"));Serial.print(fsk,HEX);
@@ -212,7 +214,7 @@ static void printSettings (byte c) {
   if (c & RFMON_PRCMDS) {
     Serial.print(F(" r {"));
     for (byte i = 0; i < sizeof(config)/sizeof(word); i++) {
-      Serial.print(" "); Serial.print(((word *) &config)[i],HEX);
+      Serial.print(" 0x"); Serial.print(((word *) &config)[i],HEX);
     }
     Serial.println("}");
 //    Serial.print(F(" RCC ")); Serial.print(config.RCC, HEX); Serial.print(F(" TXC ")); Serial.print(config.TXC, HEX); Serial.print(F(" FSC ")); Serial.print(config.FSC, HEX);
@@ -337,11 +339,9 @@ static void handleInput (char c) {
             mode = mode0;
             break;
           case 'b': // set band: 1 = 433, 2 = 868, 3 = 915
-            if (num && RF12_433MHZ <= value && value <= RF12_915MHZ) {
-              // set config parameter
-              config.gbid &= 0xFF3F | (value << 6);
+            if (num && (RF12_433MHZ <= value) && (value <= RF12_915MHZ)) {
               // set register
-              setReg(config.CSC & 0xFFCF | value << 4);
+              setReg((config.CSC & 0xFFCF) | value << 4);
             }
             printSettings(RFMON_PRXMIT); Serial.println();
             break;

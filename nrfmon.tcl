@@ -1512,7 +1512,7 @@ proc init {{scanwidth 423}} {
 	}
 	array set var {
 		title "nRfMon"
-		version v0.7.5
+		version v0.7.6
 
 		state 0
 		state0 0
@@ -2285,9 +2285,8 @@ proc parseData {} {
 		# duration of a BERT cycle * 1.5	
 		set var(ber,watchdog) [after [expr {int(1.0 / $var(xcvr,DRC,BR) * 8 * $var(ber,pcnt) * ($var(ber,plen) + 7 + 9)*1.5)}] [namespace current]::watchBER]
 	}
-	if {!$crcb} {
-		set pnr $var(ber,pnr)
-	} elseif {![binary scan [string index $var(data,data) 3] H2 pnr] || $pnr eq ""} {
+	if {![binary scan [string index $var(data,data) 3] H2 pnr] || $pnr eq ""} {
+		# empty first data byte; that is not good, bail out
 		advanceLine
 		return
 	}
@@ -2383,6 +2382,27 @@ proc parseData {} {
 	}
 	if {!$crcb} {
 		set var(ber,pnr) $pnr
+	}
+}
+
+# namespace ::mon
+proc parseRegister data {
+	variable var
+	
+	if {![dict exists $data r]} return
+	foreach r [dict get $data r] {
+		if {[expr {($r & 0xFF00) == 0x8000}]} {
+			# CSC
+			# get band
+			dict set var(xcvr,data) b [expr {$r >> 4 & 0b00000011}]
+
+		} elseif {[expr {($r & 0xF800) == 0x9000}]} {
+			# RCC
+			# get RSSI
+			dict set var(xcvr,data) RSSI [expr {$r & 0b00000111}]
+			# get LNA gain
+			dict set var(xcvr,data) LNAgain [expr {$r & 0b00011000}]
+		}
 	}
 }
 
@@ -2626,6 +2646,9 @@ proc receive port {
 				$var(quietrb) config -style [expr {$q? "active.":""}]norm.TButton
 				con "\u03df Quiet [expr {$q? {on}:{off}}]"
 			}
+			"*r" {
+				parseRegister $var(scandata)
+			}
 			default {
 				if {[llength $var(scandata)] > 2} {
 					monSync
@@ -2851,7 +2874,8 @@ proc showScan {} {
 	$var(scr) itemconfig SP -outline $var(color,outline,SP)
 	$var(scr) itemconfig SPM -fill $var(color,fill,SPM)
 	$var(scr) itemconfig {ber} -state hidden
-	$var(scr) itemconfig {gyl || gyt || gxt || ycal || ycat || maxrssi || RSth || SL} -state normal
+	$var(scr) itemconfig {gyl || gyt || gxt || ycal || ycat || RSth || SL} -state normal
+	$var(scr) itemconfig maxrssi -state [expr {$var(peak,on)? "normal":"hidden"}]
 	$var(scr) itemconfig SP -state [expr {$var(SP,on)? "normal":"hidden"}]
 	$var(scr) itemconfig SPM -state [expr {$var(maxs,on)? "normal":"hidden"}]
 	$var(scr) itemconfig gat -text "dBm"
@@ -3115,6 +3139,7 @@ proc watchBER {} {
 		ber,watchdog {}
 		ber,pnr "7f"
 		ber,noise 1
+		ber,pgood 0
 	}
 	set var(r) [expr {($var(r) + 1) % $var(wf,H)}]
 	plotBER "BER = no data\nPER = no data"
