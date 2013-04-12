@@ -2395,7 +2395,9 @@ proc parseRegister data {
 			# CSC
 			# get band
 			dict set var(xcvr,data) b [expr {$r >> 4 & 0b00000011}]
-
+			# set grid etc
+			monSync
+			
 		} elseif {[expr {($r & 0xF800) == 0x9000}]} {
 			# RCC
 			# get RSSI
