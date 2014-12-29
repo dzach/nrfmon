@@ -1,4 +1,4 @@
-#!/usr/bin/tclsh8.6
+#!/usr/bin/env tclsh8.6
 
 ## ------------------------------------------------------
 ## A software spectrum analyzer for the RF12B radio module
@@ -1372,7 +1372,7 @@ proc enumerate what {
 
 	switch -glob -nocase -- $what {
 		"ports" {
-			lappend out {*}[glob -nocomplain /dev/ttyUSB* /dev/ttyACM* /dev/tty.usbserial*] {*}[WinListSerialPorts]
+			lappend out {*}[glob -nocomplain /dev/ttyUSB* /dev/ttyACM* /dev/tty.usbserial* /dev/cu.usbmodem*] {*}[WinListSerialPorts]
 			if {[llength $out]} {
 				set out [concat {{}} $out]
 			}
