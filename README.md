@@ -41,6 +41,8 @@ CREDITS:
 
 The sketch is based on the JeeLib library, https://github.com/jcw/jeelib, created by J.C.Wippler, http://jeelabs.org/2010/06/27/rfm12b-as-spectrum-analyzer/, which was itself based on an idea of loomi, back in 2010,http://talk.jeelabs.net/topic/385
 
+For more details on how this monitor works, check this long forum thread: https://jeelabs.net/boards/6/topics/715?page=1&r=1521.
+
 LICENSE:
 
     This program is free software: you can redistribute it and/or modify
